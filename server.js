@@ -24,7 +24,16 @@ const swaggerOptions = {
         },
         servers: [
             {
+                url: process.env.SERVER_URL || 'https://appointmentbackend-9jxe.onrender.com',
+                description: 'Production Server (Render)',
+            },
+            {
                 url: `http://localhost:${process.env.PORT || 5000}`,
+                description: 'Local Development Server',
+            },
+            {
+                url: '/',
+                description: 'Dynamic Current Host',
             },
         ],
     },

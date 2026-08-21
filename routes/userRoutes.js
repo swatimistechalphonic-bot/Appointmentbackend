@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
@@ -326,6 +327,26 @@ router.get('/', async (req, res) => {
 
 /**
  * @swagger
+ * /api/users/doctors:
+ *   get:
+ *     summary: Get list of all registered doctors
+ *     tags: [Doctors]
+ *     responses:
+ *       200:
+ *         description: List of doctors retrieved successfully
+ */
+router.get('/doctors', async (req, res) => {
+    try {
+        const doctors = await User.find({ role: 'doctor' }).select('-password');
+        res.json({ success: true, count: doctors.length, doctors });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+
+/**
+ * @swagger
  * /api/users/{id}:
  *   get:
  *     summary: Get user by ID
@@ -344,6 +365,9 @@ router.get('/', async (req, res) => {
  */
 router.get('/:id', async (req, res) => {
     try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ success: false, message: 'Invalid User ID format' });
+        }
         const user = await User.findById(req.params.id).select('-password');
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });

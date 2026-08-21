@@ -1,6 +1,12 @@
 require('dotenv').config();
-const dns = require('dns');
-dns.setServers(['8.8.8.8', '8.8.4.4']);
+if (!process.env.RENDER && process.env.NODE_ENV !== 'production') {
+    try {
+        const dns = require('dns');
+        dns.setServers(['8.8.8.8', '8.8.4.4']);
+    } catch (err) {
+        // ignore
+    }
+}
 
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
