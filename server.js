@@ -7,6 +7,7 @@ const connectDB = require('./db');
 const userRoutes = require('./routes/userRoutes');
 const appointmentRoutes = require('./routes/appointmentRoutes');
 const patientRoutes = require('./routes/patientRoutes');
+const departmentRoutes = require('./routes/departmentRoutes');
 
 const app = express();
 
@@ -67,6 +68,7 @@ connectDB();
 app.use('/api/users', userRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/patients', patientRoutes);
+app.use('/api/departments', departmentRoutes);
 
 // Default Route
 app.get('/', (req, res) => {

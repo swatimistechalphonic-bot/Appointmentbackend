@@ -53,4 +53,13 @@ export const patientApi = {
   deletePatient: (id) => api.delete(`/patients/${id}`),
 };
 
+// Department API endpoints
+export const departmentApi = {
+  getAllDepartments: (params) => api.get('/departments', { params }),
+  getDepartmentById: (id) => api.get(`/departments/${id}`),
+  createDepartment: (data) => api.post('/departments', data),
+  updateDepartment: (id, data) => api.put(`/departments/${id}`, data),
+  deleteDepartment: (id) => api.delete(`/departments/${id}`),
+};
+
 export default api;
