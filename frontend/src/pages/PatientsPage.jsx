@@ -277,43 +277,33 @@ const PatientsPage = () => {
                       </span>
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      <div className="action-dropdown-container">
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem' }}>
                         <button
                           className="btn btn-secondary btn-sm"
-                          style={{ padding: '0.3rem 0.5rem' }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveMenuId(isMenuOpen ? null : patientId);
-                          }}
+                          style={{ padding: '0.4rem 0.65rem', color: '#0066FF', borderColor: '#BFDBFE', background: '#EFF6FF', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                          title="View Details"
+                          onClick={() => setViewPatient(p)}
                         >
-                          <MoreHorizontal size={16} />
+                          <Eye size={15} />
                         </button>
 
-                        {isMenuOpen && (
-                          <div className="action-dropdown-menu">
-                            <button
-                              className="action-dropdown-item"
-                              onClick={() => {
-                                setActiveMenuId(null);
-                                setViewPatient(p);
-                              }}
-                            >
-                              <Eye size={15} color="#0066FF" /> View Details
-                            </button>
-                            <button
-                              className="action-dropdown-item"
-                              onClick={() => handleOpenEditModal(p)}
-                            >
-                              <Edit size={15} color="#F59E0B" /> Edit Record
-                            </button>
-                            <button
-                              className="action-dropdown-item danger"
-                              onClick={() => handleDeletePatient(p)}
-                            >
-                              <Trash2 size={15} color="#DC2626" /> Delete Patient
-                            </button>
-                          </div>
-                        )}
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '0.4rem 0.65rem', color: '#D97706', borderColor: '#FDE68A', background: '#FFFBEB', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                          title="Edit Record"
+                          onClick={() => handleOpenEditModal(p)}
+                        >
+                          <Edit size={15} />
+                        </button>
+
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '0.4rem 0.65rem', color: '#DC2626', borderColor: '#FCA5A5', background: '#FEF2F2', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                          title="Delete Patient"
+                          onClick={() => handleDeletePatient(p)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
                       </div>
                     </td>
                   </tr>
