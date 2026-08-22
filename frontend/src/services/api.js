@@ -74,4 +74,14 @@ export const reportApi = {
   getPatientDemographicsReport: () => api.get('/reports/patient-demographics'),
 };
 
+// Doctor Reviews & Ratings API endpoints
+export const reviewApi = {
+  getAllReviews: (params) => api.get('/reviews', { params }),
+  getReviewsByDoctor: (doctorId) => api.get(`/reviews/doctor/${doctorId}`),
+  getReviewById: (id) => api.get(`/reviews/${id}`),
+  createReview: (data) => api.post('/reviews', data),
+  updateReview: (id, data) => api.put(`/reviews/${id}`, data),
+  deleteReview: (id) => api.delete(`/reviews/${id}`),
+};
+
 export default api;

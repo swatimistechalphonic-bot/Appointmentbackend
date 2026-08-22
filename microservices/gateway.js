@@ -6,13 +6,15 @@ const appointmentService = require('./appointment-service');
 const patientService = require('./patient-service');
 const departmentService = require('./department-service');
 const reportService = require('./report-service');
+const reviewService = require('./review-service');
 
 const services = [
     authService,
     appointmentService,
     patientService,
     departmentService,
-    reportService
+    reportService,
+    reviewService
 ];
 
 const registerMicroservices = (app) => {
