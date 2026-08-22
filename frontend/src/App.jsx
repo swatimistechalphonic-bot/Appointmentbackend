@@ -10,6 +10,7 @@ import PatientDashboard from './pages/PatientDashboard';
 import DoctorsPage from './pages/DoctorsPage';
 import PatientsPage from './pages/PatientsPage';
 import DepartmentsPage from './pages/DepartmentsPage';
+import SchedulesPage from './pages/SchedulesPage';
 import PharmacyPage from './pages/PharmacyPage';
 import BlogsPage from './pages/BlogsPage';
 import AppsPage from './pages/AppsPage';
@@ -46,7 +47,7 @@ const AppLayout = () => {
             <Route path="/doctors" element={<ProtectedRoute><DoctorsPage /></ProtectedRoute>} />
             <Route path="/patients" element={<ProtectedRoute><PatientsPage /></ProtectedRoute>} />
             <Route path="/departments" element={<ProtectedRoute><DepartmentsPage /></ProtectedRoute>} />
-            <Route path="/schedules" element={<ProtectedRoute><PatientDashboard /></ProtectedRoute>} />
+            <Route path="/schedules" element={<ProtectedRoute><SchedulesPage /></ProtectedRoute>} />
             <Route path="/payments" element={<ProtectedRoute><PharmacyPage /></ProtectedRoute>} />
             <Route path="/reviews" element={<ProtectedRoute><DoctorsPage /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute><ComponentsPage /></ProtectedRoute>} />
