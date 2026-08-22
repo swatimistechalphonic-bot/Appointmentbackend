@@ -62,4 +62,13 @@ export const departmentApi = {
   deleteDepartment: (id) => api.delete(`/departments/${id}`),
 };
 
+// Reports & Analytics API endpoints
+export const reportApi = {
+  getAnalytics: () => api.get('/reports/analytics'),
+  getRevenueTrends: () => api.get('/reports/revenue-trends'),
+  getAppointmentStatusReport: () => api.get('/reports/appointment-status'),
+  getDoctorPerformanceReport: () => api.get('/reports/doctor-performance'),
+  getPatientDemographicsReport: () => api.get('/reports/patient-demographics'),
+};
+
 export default api;

@@ -8,6 +8,7 @@ const userRoutes = require('./routes/userRoutes');
 const appointmentRoutes = require('./routes/appointmentRoutes');
 const patientRoutes = require('./routes/patientRoutes');
 const departmentRoutes = require('./routes/departmentRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 
 const app = express();
 
@@ -69,6 +70,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/patients', patientRoutes);
 app.use('/api/departments', departmentRoutes);
+app.use('/api/reports', reportRoutes);
 
 // Default Route
 app.get('/', (req, res) => {
