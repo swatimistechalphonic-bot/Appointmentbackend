@@ -399,6 +399,11 @@ body {
   color: #92400E;
 }
 
+.doc-badge.completed {
+  background: #F3E8FF;
+  color: #6B21A8;
+}
+
 .doc-badge.cancelled {
   background: #FEE2E2;
   color: #991B1B;

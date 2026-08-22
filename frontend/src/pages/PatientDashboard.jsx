@@ -219,8 +219,8 @@ const PatientDashboard = () => {
                     </div>
                   </div>
 
-                  <span className={`doc-badge ${app.status === 'confirmed' ? 'confirmed' : app.status === 'cancelled' ? 'cancelled' : 'pending'}`}>
-                    {app.status}
+                  <span className={`doc-badge ${app.status || 'pending'}`}>
+                    {app.status === 'completed' ? '🎉 Completed' : app.status === 'confirmed' ? '✅ Confirmed' : app.status === 'cancelled' ? '❌ Cancelled' : '⏳ Pending'}
                   </span>
                 </div>
 
@@ -235,31 +235,80 @@ const PatientDashboard = () => {
                   )}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', paddingTop: '0.75rem', borderTop: '1px solid #F1F5F9' }}>
-                  <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#64748B' }}>Status:</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <select
-                      className="filter-select"
-                      style={{ padding: '0.25rem 1.6rem 0.25rem 0.6rem', fontSize: '0.8rem', fontWeight: '700' }}
-                      value={app.status || 'pending'}
-                      onChange={(e) => handleStatusUpdate(app._id || app.id, e.target.value)}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', paddingTop: '0.75rem', borderTop: '1px solid #F1F5F9' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: '700', color: '#64748B' }}>Change Status:</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleStatusUpdate(app._id || app.id, 'pending')}
+                      style={{
+                        padding: '0.35rem 0.7rem',
+                        borderRadius: '8px',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                        border: '1px solid #FDE68A',
+                        background: app.status === 'pending' ? '#F59E0B' : '#FEF3C7',
+                        color: app.status === 'pending' ? '#FFFFFF' : '#92400E',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
                     >
-                      <option value="pending">Pending</option>
-                      <option value="confirmed">Confirmed</option>
-                      <option value="completed">Completed</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
+                      ⏳ Pending
+                    </button>
 
-                    {app.status !== 'cancelled' && (
-                      <button
-                        onClick={() => handleStatusUpdate(app._id || app.id, 'cancelled')}
-                        className="btn btn-secondary btn-sm"
-                        style={{ color: '#DC2626', borderColor: '#FECACA', padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}
-                        title="Cancel Appointment"
-                      >
-                        <Trash2 size={13} /> Cancel
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleStatusUpdate(app._id || app.id, 'confirmed')}
+                      style={{
+                        padding: '0.35rem 0.7rem',
+                        borderRadius: '8px',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                        border: '1px solid #A7F3D0',
+                        background: app.status === 'confirmed' ? '#10B981' : '#ECFDF5',
+                        color: app.status === 'confirmed' ? '#FFFFFF' : '#065F46',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      ✅ Confirm
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleStatusUpdate(app._id || app.id, 'completed')}
+                      style={{
+                        padding: '0.35rem 0.7rem',
+                        borderRadius: '8px',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                        border: '1px solid #DDD6FE',
+                        background: app.status === 'completed' ? '#8B5CF6' : '#F3E8FF',
+                        color: app.status === 'completed' ? '#FFFFFF' : '#6B21A8',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      🎉 Complete
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleStatusUpdate(app._id || app.id, 'cancelled')}
+                      style={{
+                        padding: '0.35rem 0.7rem',
+                        borderRadius: '8px',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                        border: '1px solid #FECACA',
+                        background: app.status === 'cancelled' ? '#EF4444' : '#FEE2E2',
+                        color: app.status === 'cancelled' ? '#FFFFFF' : '#991B1B',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      ❌ Cancel
+                    </button>
                   </div>
                 </div>
               </div>
