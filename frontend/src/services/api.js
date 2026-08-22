@@ -84,4 +84,12 @@ export const reviewApi = {
   deleteReview: (id) => api.delete(`/reviews/${id}`),
 };
 
+// Real-Time Consultation Chat API endpoints
+export const chatApi = {
+  sendMessage: (data) => api.post('/chat/send', data),
+  getConversation: (userId) => api.get(`/chat/conversation/${userId}`),
+  getContacts: () => api.get('/chat/contacts'),
+  markAsRead: (senderId) => api.put(`/chat/read/${senderId}`),
+};
+
 export default api;

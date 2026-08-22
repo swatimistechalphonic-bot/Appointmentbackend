@@ -9,6 +9,7 @@ import DoctorDashboard from './pages/DoctorDashboard';
 import PatientDashboard from './pages/PatientDashboard';
 import DoctorsPage from './pages/DoctorsPage';
 import PatientsPage from './pages/PatientsPage';
+import ChatPage from './pages/ChatPage';
 import DepartmentsPage from './pages/DepartmentsPage';
 import SchedulesPage from './pages/SchedulesPage';
 import ReportsPage from './pages/ReportsPage';
@@ -48,6 +49,7 @@ const AppLayout = () => {
             <Route path="/appointments" element={<ProtectedRoute><PatientDashboard /></ProtectedRoute>} />
             <Route path="/doctors" element={<ProtectedRoute><DoctorsPage /></ProtectedRoute>} />
             <Route path="/patients" element={<ProtectedRoute><PatientsPage /></ProtectedRoute>} />
+            <Route path="/messages" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
             <Route path="/departments" element={<ProtectedRoute><DepartmentsPage /></ProtectedRoute>} />
             <Route path="/schedules" element={<ProtectedRoute><SchedulesPage /></ProtectedRoute>} />
             <Route path="/payments" element={<ProtectedRoute><PharmacyPage /></ProtectedRoute>} />
