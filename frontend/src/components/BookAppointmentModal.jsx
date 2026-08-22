@@ -233,7 +233,7 @@ const BookAppointmentModal = ({ isOpen, onClose, onBookingSuccess, preselectedDo
             padding: '0.85rem 1rem',
             margin: '1rem 0 1.25rem',
             display: 'flex',
-            justify: 'space-between',
+            justifyContent: 'space-between',
             alignItems: 'center'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.84rem', color: '#64748B', fontWeight: '600' }}>
