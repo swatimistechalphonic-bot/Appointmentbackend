@@ -7,7 +7,7 @@ const { protect } = require('../middleware/auth');
 const defaultSettings = {
     appName: 'DocAdmin',
     appSubtitle: 'Doctor Appointment System',
-    logoUrl: '',
+    logoUrl: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=100&auto=format&fit=crop&q=80',
     faviconUrl: '',
     primaryColor: '#0066FF',
     contactEmail: 'support@docadmin.com',
@@ -17,10 +17,13 @@ const defaultSettings = {
 
 const seedSettings = async () => {
     try {
-        const count = await Setting.countDocuments();
-        if (count === 0) {
+        const settings = await Setting.findOne();
+        if (!settings) {
             await Setting.create(defaultSettings);
             console.log('✅ Default System Settings & Dynamic Logo Seeded Successfully');
+        } else if (!settings.logoUrl) {
+            settings.logoUrl = defaultSettings.logoUrl;
+            await settings.save();
         }
     } catch (err) {
         console.error('Settings seed error:', err.message);
@@ -44,6 +47,9 @@ router.get('/', async (req, res) => {
         let settings = await Setting.findOne();
         if (!settings) {
             settings = await Setting.create(defaultSettings);
+        } else if (!settings.logoUrl) {
+            settings.logoUrl = defaultSettings.logoUrl;
+            await settings.save();
         }
 
         res.json({

@@ -27,7 +27,7 @@ const Sidebar = () => {
   const [appSettings, setAppSettings] = useState({
     appName: 'DocAdmin',
     appSubtitle: 'Doctor Appointment System',
-    logoUrl: ''
+    logoUrl: localStorage.getItem('docadmin_logo_url') || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=100&auto=format&fit=crop&q=80'
   });
 
   useEffect(() => {
@@ -43,6 +43,9 @@ const Sidebar = () => {
       const res = await settingApi.getSettings();
       if (res.data?.success && res.data.settings) {
         setAppSettings(res.data.settings);
+        if (res.data.settings.logoUrl) {
+          localStorage.setItem('docadmin_logo_url', res.data.settings.logoUrl);
+        }
       }
     } catch (err) {
       console.error('Fetch Settings Error:', err);
@@ -68,12 +71,15 @@ const Sidebar = () => {
     <aside className="doctris-sidebar">
       {/* Brand Logo matching dynamic settings */}
       <Link to="/" className="sidebar-brand">
-        <div className="sidebar-brand-icon">
+        <div className="sidebar-brand-icon" style={{ overflow: 'hidden', padding: 0 }}>
           {appSettings.logoUrl ? (
             <img
               src={appSettings.logoUrl}
               alt={appSettings.appName}
-              style={{ width: '38px', height: '38px', objectFit: 'contain', borderRadius: '8px' }}
+              style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '10px' }}
+              onError={(e) => {
+                e.target.style.display = 'none';
+              }}
             />
           ) : (
             <HeartPulse size={26} strokeWidth={2.5} />
