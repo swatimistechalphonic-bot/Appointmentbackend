@@ -15,20 +15,27 @@ const PatientDashboard = () => {
   const userId = user?.id || user?._id;
 
   useEffect(() => {
-    if (userId) {
-      fetchAppointments();
-    } else {
-      setLoading(false);
-    }
-  }, [userId]);
+    fetchAppointments();
+  }, [userId, statusFilter]);
 
   const fetchAppointments = async () => {
     setLoading(true);
     setError('');
     try {
-      const res = await appointmentApi.getUserAppointments(userId);
-      if (res.data?.success) {
+      const params = {};
+      if (userId) params.userId = userId;
+      if (statusFilter && statusFilter !== 'all') {
+        params.status = statusFilter;
+      }
+
+      const res = await appointmentApi.getAllAppointments(params);
+      if (res.data?.success && Array.isArray(res.data.appointments)) {
         setAppointments(res.data.appointments);
+      } else {
+        const userRes = await appointmentApi.getUserAppointments(userId);
+        if (userRes.data?.success) {
+          setAppointments(userRes.data.appointments);
+        }
       }
     } catch (err) {
       setError('Failed to load appointments');
