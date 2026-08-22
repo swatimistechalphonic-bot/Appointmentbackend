@@ -7,8 +7,7 @@ const connectDB = require('./db');
 const userRoutes = require('./routes/userRoutes');
 const appointmentRoutes = require('./routes/appointmentRoutes');
 const patientRoutes = require('./routes/patientRoutes');
-const departmentRoutes = require('./routes/departmentRoutes');
-const reportRoutes = require('./routes/reportRoutes');
+const { registerMicroservices } = require('./microservices/gateway');
 
 const app = express();
 
@@ -65,12 +64,8 @@ app.use('/api-docs', (req, res, next) => {
 console.log("Mongo URI:", process.env.MONGODB_URI);
 connectDB();
 
-// API Routes
-app.use('/api/users', userRoutes);
-app.use('/api/appointments', appointmentRoutes);
-app.use('/api/patients', patientRoutes);
-app.use('/api/departments', departmentRoutes);
-app.use('/api/reports', reportRoutes);
+// Microservices Gateway API Routes
+registerMicroservices(app);
 
 // Default Route
 app.get('/', (req, res) => {
