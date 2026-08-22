@@ -24,17 +24,33 @@ const Sidebar = () => {
   const location = useLocation();
   const activePath = location.pathname;
   const { logout } = useAuth();
+  const [logoError, setLogoError] = useState(false);
   const [appSettings, setAppSettings] = useState({
-    appName: 'DocAdmin',
-    appSubtitle: 'Doctor Appointment System',
+    appName: localStorage.getItem('docadmin_app_name') || 'DocAdmin',
+    appSubtitle: localStorage.getItem('docadmin_app_subtitle') || 'Doctor Appointment System',
     logoUrl: localStorage.getItem('docadmin_logo_url') || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=100&auto=format&fit=crop&q=80'
   });
 
   useEffect(() => {
     fetchAppSettings();
-    window.addEventListener('app_settings_updated', fetchAppSettings);
+
+    const handleSettingsEvent = (e) => {
+      setLogoError(false);
+      if (e?.detail) {
+        setAppSettings((prev) => ({
+          ...prev,
+          appName: e.detail.appName || prev.appName,
+          appSubtitle: e.detail.appSubtitle || prev.appSubtitle,
+          logoUrl: e.detail.logoUrl || prev.logoUrl
+        }));
+      } else {
+        fetchAppSettings();
+      }
+    };
+
+    window.addEventListener('app_settings_updated', handleSettingsEvent);
     return () => {
-      window.removeEventListener('app_settings_updated', fetchAppSettings);
+      window.removeEventListener('app_settings_updated', handleSettingsEvent);
     };
   }, [location.pathname]);
 
@@ -72,14 +88,12 @@ const Sidebar = () => {
       {/* Brand Logo matching dynamic settings */}
       <Link to="/" className="sidebar-brand">
         <div className="sidebar-brand-icon" style={{ overflow: 'hidden', padding: 0 }}>
-          {appSettings.logoUrl ? (
+          {appSettings.logoUrl && !logoError ? (
             <img
               src={appSettings.logoUrl}
               alt={appSettings.appName}
               style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '10px' }}
-              onError={(e) => {
-                e.target.style.display = 'none';
-              }}
+              onError={() => setLogoError(true)}
             />
           ) : (
             <HeartPulse size={26} strokeWidth={2.5} />

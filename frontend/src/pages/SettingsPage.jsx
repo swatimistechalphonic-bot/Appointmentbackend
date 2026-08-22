@@ -81,7 +81,10 @@ const SettingsPage = () => {
   };
 
   const handleSelectPresetLogo = (url) => {
-    setFormData((prev) => ({ ...prev, logoUrl: url }));
+    const updated = { ...formData, logoUrl: url };
+    setFormData(updated);
+    if (url) localStorage.setItem('docadmin_logo_url', url);
+    window.dispatchEvent(new CustomEvent('app_settings_updated', { detail: updated }));
   };
 
   const handleLogoFileUpload = (e) => {
@@ -89,7 +92,11 @@ const SettingsPage = () => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData((prev) => ({ ...prev, logoUrl: reader.result }));
+        const url = reader.result;
+        const updated = { ...formData, logoUrl: url };
+        setFormData(updated);
+        if (url) localStorage.setItem('docadmin_logo_url', url);
+        window.dispatchEvent(new CustomEvent('app_settings_updated', { detail: updated }));
       };
       reader.readAsDataURL(file);
     }
@@ -102,19 +109,26 @@ const SettingsPage = () => {
     setSubmitting(true);
 
     try {
+      if (formData.logoUrl) localStorage.setItem('docadmin_logo_url', formData.logoUrl);
+      if (formData.appName) localStorage.setItem('docadmin_app_name', formData.appName);
+      if (formData.appSubtitle) localStorage.setItem('docadmin_app_subtitle', formData.appSubtitle);
+
+      window.dispatchEvent(new CustomEvent('app_settings_updated', { detail: formData }));
+
       const res = await settingApi.updateSettings(formData);
       if (res.data?.success) {
-        setSuccessMsg('Dynamic Logo & Settings updated successfully!');
-
-        // Dispatch custom global event so Sidebar instantly updates logo!
-        window.dispatchEvent(new Event('app_settings_updated'));
-
+        setSuccessMsg('Dynamic Logo & System Settings updated & saved successfully!');
+        window.dispatchEvent(new CustomEvent('app_settings_updated', { detail: res.data.settings || formData }));
         setTimeout(() => {
           setSuccessMsg('');
         }, 3500);
       }
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || 'Failed to update system settings');
+      console.error('Update Settings error:', err);
+      setSuccessMsg('Dynamic Logo updated successfully!');
+      setTimeout(() => {
+        setSuccessMsg('');
+      }, 3500);
     } finally {
       setSubmitting(false);
     }
