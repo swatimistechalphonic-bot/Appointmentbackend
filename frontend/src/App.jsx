@@ -11,6 +11,7 @@ import DoctorsPage from './pages/DoctorsPage';
 import PatientsPage from './pages/PatientsPage';
 import DepartmentsPage from './pages/DepartmentsPage';
 import SchedulesPage from './pages/SchedulesPage';
+import ReportsPage from './pages/ReportsPage';
 import PharmacyPage from './pages/PharmacyPage';
 import BlogsPage from './pages/BlogsPage';
 import AppsPage from './pages/AppsPage';
@@ -50,7 +51,7 @@ const AppLayout = () => {
             <Route path="/schedules" element={<ProtectedRoute><SchedulesPage /></ProtectedRoute>} />
             <Route path="/payments" element={<ProtectedRoute><PharmacyPage /></ProtectedRoute>} />
             <Route path="/reviews" element={<ProtectedRoute><DoctorsPage /></ProtectedRoute>} />
-            <Route path="/reports" element={<ProtectedRoute><ComponentsPage /></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><ComponentsPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><DoctorsPage /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
