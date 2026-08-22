@@ -9,37 +9,18 @@ import {
   AlertCircle,
   RefreshCw,
   HeartPulse,
-  Mail,
-  Phone,
-  Palette,
   Upload,
-  Check
+  Check,
+  RotateCcw,
+  FileImage
 } from 'lucide-react';
-
-const PRESET_LOGOS = [
-  {
-    name: 'DocAdmin Medical Pulse (Blue)',
-    url: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=100&auto=format&fit=crop&q=80'
-  },
-  {
-    name: 'CareSync Cross (Red)',
-    url: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=100&auto=format&fit=crop&q=80'
-  },
-  {
-    name: 'Wellness Shield (Green)',
-    url: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=100&auto=format&fit=crop&q=80'
-  },
-  {
-    name: 'Hospital Wing (Purple)',
-    url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?w=100&auto=format&fit=crop&q=80'
-  }
-];
 
 const SettingsPage = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [selectedFileName, setSelectedFileName] = useState('');
 
   const [formData, setFormData] = useState({
     appName: 'DocAdmin',
@@ -64,7 +45,7 @@ const SettingsPage = () => {
         setFormData({
           appName: res.data.settings.appName || 'DocAdmin',
           appSubtitle: res.data.settings.appSubtitle || 'Doctor Appointment System',
-          logoUrl: res.data.settings.logoUrl || '',
+          logoUrl: res.data.settings.logoUrl || localStorage.getItem('docadmin_logo_url') || '',
           faviconUrl: res.data.settings.faviconUrl || '',
           primaryColor: res.data.settings.primaryColor || '#0066FF',
           contactEmail: res.data.settings.contactEmail || 'support@docadmin.com',
@@ -80,26 +61,31 @@ const SettingsPage = () => {
     }
   };
 
-  const handleSelectPresetLogo = (url) => {
-    const updated = { ...formData, logoUrl: url };
-    setFormData(updated);
-    if (url) localStorage.setItem('docadmin_logo_url', url);
-    window.dispatchEvent(new CustomEvent('app_settings_updated', { detail: updated }));
-  };
-
-  const handleLogoFileUpload = (e) => {
+  const handleFileChoose = (e) => {
     const file = e.target.files[0];
     if (file) {
+      setSelectedFileName(file.name);
       const reader = new FileReader();
       reader.onloadend = () => {
-        const url = reader.result;
-        const updated = { ...formData, logoUrl: url };
+        const base64Data = reader.result;
+        const updated = { ...formData, logoUrl: base64Data };
         setFormData(updated);
-        if (url) localStorage.setItem('docadmin_logo_url', url);
+
+        // Instant local preview update
+        localStorage.setItem('docadmin_logo_url', base64Data);
         window.dispatchEvent(new CustomEvent('app_settings_updated', { detail: updated }));
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleResetLogo = () => {
+    const defaultLogo = 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=100&auto=format&fit=crop&q=80';
+    setSelectedFileName('');
+    const updated = { ...formData, logoUrl: defaultLogo };
+    setFormData(updated);
+    localStorage.setItem('docadmin_logo_url', defaultLogo);
+    window.dispatchEvent(new CustomEvent('app_settings_updated', { detail: updated }));
   };
 
   const handleSubmit = async (e) => {
@@ -117,18 +103,18 @@ const SettingsPage = () => {
 
       const res = await settingApi.updateSettings(formData);
       if (res.data?.success) {
-        setSuccessMsg('Dynamic Logo & System Settings updated & saved successfully!');
+        setSuccessMsg('✅ Dynamic App Logo & Settings saved successfully! Displayed across Dashboard & Sidebar.');
         window.dispatchEvent(new CustomEvent('app_settings_updated', { detail: res.data.settings || formData }));
         setTimeout(() => {
           setSuccessMsg('');
-        }, 3500);
+        }, 4000);
       }
     } catch (err) {
-      console.error('Update Settings error:', err);
-      setSuccessMsg('Dynamic Logo updated successfully!');
+      console.error('Update Settings Error:', err);
+      setSuccessMsg('✅ Dynamic App Logo updated locally on Dashboard!');
       setTimeout(() => {
         setSuccessMsg('');
-      }, 3500);
+      }, 4000);
     } finally {
       setSubmitting(false);
     }
@@ -140,9 +126,9 @@ const SettingsPage = () => {
       <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#0F172A', marginBottom: '0.2rem' }}>
-            Dynamic App Logo & System Settings ⚙️
+            Dynamic App Logo Upload 📁
           </h1>
-          <p style={{ color: '#64748B', fontSize: '0.88rem' }}>Change app logo dynamically, customize branding title, and update contact details</p>
+          <p style={{ color: '#64748B', fontSize: '0.88rem' }}>Choose an image file from your computer to update the Dashboard & Sidebar logo</p>
         </div>
 
         <button onClick={fetchSettings} className="btn btn-secondary btn-sm" title="Reload Settings">
@@ -151,8 +137,8 @@ const SettingsPage = () => {
       </div>
 
       {successMsg && (
-        <div className="alert alert-success">
-          <CheckCircle2 size={18} />
+        <div className="alert alert-success" style={{ background: '#DCFCE7', color: '#166534', borderColor: '#BBF7D0', padding: '0.9rem 1.25rem', borderRadius: '12px', fontSize: '0.9rem', fontWeight: '600' }}>
+          <CheckCircle2 size={20} color="#166534" />
           <span>{successMsg}</span>
         </div>
       )}
@@ -166,104 +152,88 @@ const SettingsPage = () => {
 
       {loading ? (
         <div style={{ padding: '3rem', textAlign: 'center', color: '#64748B' }}>
-          Loading dynamic system settings...
+          Loading logo settings...
         </div>
       ) : (
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* Card 1: Dynamic Logo & Brand Identity */}
+          {/* Main Card: Choose File Logo Section */}
           <div className="card">
             <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0F172A', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Image size={20} color="#0066FF" /> Dynamic Logo Management
+              <FileImage size={22} color="#0066FF" /> Select App Logo Image File
             </h3>
 
-            {/* Live Logo Preview Box */}
-            <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', padding: '1.25rem 1.5rem', borderRadius: '14px', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.25rem', border: '1px solid #334155' }}>
-              <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
+            {/* Live Sidebar Logo Preview Box */}
+            <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', padding: '1.4rem 1.75rem', borderRadius: '16px', marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '1.5rem', border: '1px solid #334155', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)' }}>
+              <div style={{ width: '60px', height: '60px', borderRadius: '14px', background: 'rgba(255, 255, 255, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(255, 255, 255, 0.25)', overflow: 'hidden' }}>
                 {formData.logoUrl ? (
                   <img
                     src={formData.logoUrl}
-                    alt="Dynamic Logo Preview"
-                    style={{ width: '42px', height: '42px', objectFit: 'cover', borderRadius: '8px' }}
+                    alt="Uploaded Logo Preview"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     onError={(e) => { e.target.style.display = 'none'; }}
                   />
                 ) : (
-                  <HeartPulse size={28} color="#FFFFFF" />
+                  <HeartPulse size={32} color="#FFFFFF" />
                 )}
               </div>
 
               <div>
-                <div style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '0.2rem' }}>
-                  LIVE SIDEBAR LOGO PREVIEW
+                <div style={{ fontSize: '0.75rem', color: '#38BDF8', fontWeight: '800', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                  DASHBOARD & SIDEBAR LOGO PREVIEW
                 </div>
-                <h3 style={{ fontSize: '1.3rem', fontWeight: '800', color: '#FFFFFF', margin: 0, lineHeight: '1.1' }}>
+                <h3 style={{ fontSize: '1.4rem', fontWeight: '800', color: '#FFFFFF', margin: 0, lineHeight: '1.1' }}>
                   {formData.appName || 'DocAdmin'}
                 </h3>
-                <span style={{ fontSize: '0.78rem', color: '#94A3B8', fontWeight: '500' }}>
+                <span style={{ fontSize: '0.8rem', color: '#94A3B8', fontWeight: '500' }}>
                   {formData.appSubtitle || 'Doctor Appointment System'}
                 </span>
               </div>
             </div>
 
-            {/* Logo Presets Selection */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#0F172A', marginBottom: '0.65rem', display: 'block' }}>
-                Option A: Choose Preset Medical Logo
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
-                {PRESET_LOGOS.map((preset) => {
-                  const isSelected = formData.logoUrl === preset.url;
-                  return (
-                    <div
-                      key={preset.name}
-                      onClick={() => handleSelectPresetLogo(preset.url)}
-                      style={{
-                        padding: '0.75rem',
-                        borderRadius: '12px',
-                        border: isSelected ? '2px solid #0066FF' : '1px solid #E2E8F0',
-                        background: isSelected ? '#EFF6FF' : '#F8FAFC',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.75rem',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      <img src={preset.url} alt={preset.name} style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'cover' }} />
-                      <div style={{ flex: 1, fontSize: '0.78rem', fontWeight: '700', color: '#0F172A' }}>
-                        {preset.name}
-                      </div>
-                      {isSelected && <Check size={16} color="#0066FF" />}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            {/* Dedicated File Chooser UI */}
+            <div style={{ background: '#F8FAFC', border: '2px dashed #CBD5E1', borderRadius: '16px', padding: '2rem 1.5rem', textAlign: 'center', marginBottom: '1.5rem' }}>
+              <Upload size={38} color="#0066FF" style={{ margin: '0 auto 0.75rem' }} />
+              <h4 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#0F172A', margin: '0 0 0.35rem 0' }}>
+                Select Image File from Computer
+              </h4>
+              <p style={{ fontSize: '0.84rem', color: '#64748B', margin: '0 0 1.25rem 0' }}>
+                Supports PNG, JPG, JPEG, SVG image files
+              </p>
 
-            {/* Logo URL Input & File Upload */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
-              <div className="form-group">
-                <label>Option B: Paste Direct Logo URL</label>
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                <label
+                  htmlFor="logoFileInput"
+                  className="btn btn-primary"
+                  style={{ cursor: 'pointer', padding: '0.65rem 1.5rem', fontSize: '0.9rem', fontWeight: '700', borderRadius: '10px' }}
+                >
+                  <Upload size={18} /> Choose File
+                </label>
                 <input
-                  type="text"
-                  className="input-field"
-                  placeholder="https://example.com/logo.png"
-                  value={formData.logoUrl}
-                  onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Option C: Upload Logo File from Device</label>
-                <input
+                  id="logoFileInput"
                   type="file"
                   accept="image/*"
-                  className="input-field"
-                  onChange={handleLogoFileUpload}
-                  style={{ padding: '0.45rem' }}
+                  onChange={handleFileChoose}
+                  style={{ display: 'none' }}
                 />
+
+                <button
+                  type="button"
+                  onClick={handleResetLogo}
+                  className="btn btn-secondary"
+                  style={{ padding: '0.65rem 1.25rem', fontSize: '0.85rem' }}
+                >
+                  <RotateCcw size={15} /> Reset Default
+                </button>
               </div>
+
+              {selectedFileName && (
+                <div style={{ marginTop: '1rem', color: '#166534', fontWeight: '600', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+                  <Check size={16} /> Selected File: {selectedFileName}
+                </div>
+              )}
             </div>
 
+            {/* App Branding Name & Subtitle Inputs */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="form-group">
                 <label>App Title / Brand Name *</label>
@@ -288,10 +258,10 @@ const SettingsPage = () => {
             </div>
           </div>
 
-          {/* Card 2: Contact Info & Footer */}
+          {/* Contact Details Card */}
           <div className="card">
             <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0F172A', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Globe size={20} color="#0066FF" /> Contact Details & Footer Text
+              <Globe size={20} color="#0066FF" /> Support Info & Footer
             </h3>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -327,10 +297,15 @@ const SettingsPage = () => {
             </div>
           </div>
 
-          {/* Save Button */}
+          {/* Submit Action Button */}
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2rem' }} disabled={submitting}>
-              <Save size={18} /> {submitting ? 'Saving Logo & Settings...' : 'Save Dynamic Logo & Settings'}
+            <button
+              type="submit"
+              className="btn btn-primary"
+              style={{ padding: '0.85rem 2.25rem', fontSize: '0.95rem', fontWeight: '700', borderRadius: '12px' }}
+              disabled={submitting}
+            >
+              <Save size={18} /> {submitting ? 'Saving Logo...' : 'Save Dynamic Logo'}
             </button>
           </div>
         </form>
