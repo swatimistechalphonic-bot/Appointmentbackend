@@ -129,12 +129,17 @@ const ChatPage = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', height: 'calc(100vh - 140px)' }}>
       {/* Header Banner */}
-      <div className="card" style={{ padding: '1rem 1.4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="card" style={{ padding: '1rem 1.4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#0F172A', margin: 0 }}>
             Doctor Consultation Chat 💬
           </h1>
           <p style={{ color: '#64748B', fontSize: '0.84rem', margin: 0 }}>Direct real-time messaging with specialist doctors</p>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#DCFCE7', color: '#166534', padding: '0.4rem 0.85rem', borderRadius: '20px', fontSize: '0.78rem', fontWeight: '700', border: '1px solid #BBF7D0' }}>
+          <CheckCheck size={16} color="#166534" />
+          <span>Confirmed Appointment Chat Active</span>
         </div>
       </div>
 
