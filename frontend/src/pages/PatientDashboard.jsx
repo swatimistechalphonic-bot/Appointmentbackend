@@ -45,15 +45,22 @@ const PatientDashboard = () => {
     }
   };
 
-  const handleCancelAppointment = async (id) => {
-    if (!window.confirm('Are you sure you want to cancel this appointment?')) return;
+  const handleStatusUpdate = async (id, newStatus) => {
     try {
-      const res = await appointmentApi.updateAppointment(id, { status: 'cancelled' });
-      if (res.data?.success) {
-        fetchAppointments();
+      // Optimistically update local state for instant response
+      setAppointments(prev =>
+        prev.map(a => (a._id === id || a.id === id ? { ...a, status: newStatus } : a))
+      );
+
+      if (id && String(id).length > 10) {
+        const res = await appointmentApi.updateAppointment(id, { status: newStatus });
+        if (res.data?.success) {
+          fetchAppointments();
+        }
       }
     } catch (err) {
-      alert('Failed to cancel appointment');
+      console.error('Failed to update status:', err);
+      alert('Failed to update status on server');
     }
   };
 
@@ -228,12 +235,33 @@ const PatientDashboard = () => {
                   )}
                 </div>
 
-                {app.status !== 'cancelled' && app.status !== 'completed' && (
-                  <button onClick={() => handleCancelAppointment(app._id)} className="btn btn-secondary btn-sm" style={{ color: '#DC2626', width: '100%', borderColor: '#FECACA' }}>
-                    <Trash2 size={14} />
-                    Cancel Booking
-                  </button>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', paddingTop: '0.75rem', borderTop: '1px solid #F1F5F9' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#64748B' }}>Status:</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <select
+                      className="filter-select"
+                      style={{ padding: '0.25rem 1.6rem 0.25rem 0.6rem', fontSize: '0.8rem', fontWeight: '700' }}
+                      value={app.status || 'pending'}
+                      onChange={(e) => handleStatusUpdate(app._id || app.id, e.target.value)}
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+
+                    {app.status !== 'cancelled' && (
+                      <button
+                        onClick={() => handleStatusUpdate(app._id || app.id, 'cancelled')}
+                        className="btn btn-secondary btn-sm"
+                        style={{ color: '#DC2626', borderColor: '#FECACA', padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}
+                        title="Cancel Appointment"
+                      >
+                        <Trash2 size={13} /> Cancel
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             ))}
           </div>

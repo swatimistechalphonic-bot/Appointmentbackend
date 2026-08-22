@@ -462,6 +462,10 @@ router.get('/:id', protect, async (req, res) => {
  */
 router.put('/:id', protect, async (req, res) => {
     try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ success: false, message: 'Invalid Appointment ID format' });
+        }
+
         const { date, timeSlot, status, reason, notes, paymentStatus, doctorName, specialization } = req.body;
         const updateData = {};
 
@@ -522,6 +526,10 @@ router.put('/:id', protect, async (req, res) => {
  */
 router.delete('/:id', protect, async (req, res) => {
     try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ success: false, message: 'Invalid Appointment ID format' });
+        }
+
         const appointment = await Appointment.findByIdAndDelete(req.params.id);
 
         if (!appointment) {
