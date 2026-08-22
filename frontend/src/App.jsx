@@ -17,6 +17,7 @@ import ReviewsPage from './pages/ReviewsPage';
 import PharmacyPage from './pages/PharmacyPage';
 import BlogsPage from './pages/BlogsPage';
 import AppsPage from './pages/AppsPage';
+import SettingsPage from './pages/SettingsPage';
 import ComponentsPage from './pages/ComponentsPage';
 
 const ProtectedRoute = ({ children }) => {
@@ -55,7 +56,7 @@ const AppLayout = () => {
             <Route path="/payments" element={<ProtectedRoute><PharmacyPage /></ProtectedRoute>} />
             <Route path="/reviews" element={<ProtectedRoute><ReviewsPage /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><ComponentsPage /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><DoctorsPage /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

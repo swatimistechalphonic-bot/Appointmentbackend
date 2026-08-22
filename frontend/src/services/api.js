@@ -95,4 +95,10 @@ export const chatApi = {
   markAsRead: (senderId) => api.put(`/chat/read/${senderId}`),
 };
 
+// System Settings & Dynamic Logo API endpoints
+export const settingApi = {
+  getSettings: () => api.get('/settings'),
+  updateSettings: (data) => api.put('/settings', data),
+};
+
 export default api;

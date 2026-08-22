@@ -8,6 +8,7 @@ const departmentService = require('./department-service');
 const reportService = require('./report-service');
 const reviewService = require('./review-service');
 const chatService = require('./chat-service');
+const settingService = require('./setting-service');
 
 const services = [
     authService,
@@ -16,7 +17,8 @@ const services = [
     departmentService,
     reportService,
     reviewService,
-    chatService
+    chatService,
+    settingService
 ];
 
 const registerMicroservices = (app) => {

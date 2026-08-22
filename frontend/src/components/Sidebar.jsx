@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { settingApi } from '../services/api';
 import {
   LayoutDashboard,
   Calendar,
@@ -23,6 +24,26 @@ const Sidebar = () => {
   const location = useLocation();
   const activePath = location.pathname;
   const { logout } = useAuth();
+  const [appSettings, setAppSettings] = useState({
+    appName: 'DocAdmin',
+    appSubtitle: 'Doctor Appointment System',
+    logoUrl: ''
+  });
+
+  useEffect(() => {
+    fetchAppSettings();
+  }, [location.pathname]);
+
+  const fetchAppSettings = async () => {
+    try {
+      const res = await settingApi.getSettings();
+      if (res.data?.success && res.data.settings) {
+        setAppSettings(res.data.settings);
+      }
+    } catch (err) {
+      console.error('Fetch Settings Error:', err);
+    }
+  };
 
   const menuItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -41,17 +62,25 @@ const Sidebar = () => {
 
   return (
     <aside className="doctris-sidebar">
-      {/* Brand Logo matching screenshot */}
+      {/* Brand Logo matching dynamic settings */}
       <Link to="/" className="sidebar-brand">
         <div className="sidebar-brand-icon">
-          <HeartPulse size={26} strokeWidth={2.5} />
+          {appSettings.logoUrl ? (
+            <img
+              src={appSettings.logoUrl}
+              alt={appSettings.appName}
+              style={{ width: '38px', height: '38px', objectFit: 'contain', borderRadius: '8px' }}
+            />
+          ) : (
+            <HeartPulse size={26} strokeWidth={2.5} />
+          )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#FFFFFF', lineHeight: '1.1' }}>
-            DocAdmin
+            {appSettings.appName || 'DocAdmin'}
           </span>
           <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: '500' }}>
-            Doctor Appointment System
+            {appSettings.appSubtitle || 'Doctor Appointment System'}
           </span>
         </div>
       </Link>
