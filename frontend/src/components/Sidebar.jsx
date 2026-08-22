@@ -32,6 +32,10 @@ const Sidebar = () => {
 
   useEffect(() => {
     fetchAppSettings();
+    window.addEventListener('app_settings_updated', fetchAppSettings);
+    return () => {
+      window.removeEventListener('app_settings_updated', fetchAppSettings);
+    };
   }, [location.pathname]);
 
   const fetchAppSettings = async () => {
