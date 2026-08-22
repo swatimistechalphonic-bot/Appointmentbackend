@@ -40,16 +40,32 @@ const DoctorDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       const statsRes = await appointmentApi.getDashboardStats();
-      if (statsRes.data?.success && statsRes.data.stats) {
-        setStats(prev => ({
-          ...prev,
-          ...statsRes.data.stats
-        }));
-      }
-
       const appRes = await appointmentApi.getAllAppointments();
-      if (appRes.data?.success) {
-        setAppointments(appRes.data.appointments);
+
+      const liveApps = appRes.data?.appointments || [];
+      setAppointments(liveApps);
+
+      if (statsRes.data?.success && statsRes.data.stats) {
+        setStats(statsRes.data.stats);
+      } else if (liveApps.length > 0) {
+        const total = liveApps.length;
+        const todayStr = new Date().toISOString().split('T')[0];
+        const todayCount = liveApps.filter(a => a.date === todayStr).length;
+        const pendingCount = liveApps.filter(a => a.status === 'pending').length;
+        const completedCount = liveApps.filter(a => a.status === 'completed').length;
+        const cancelledCount = liveApps.filter(a => a.status === 'cancelled').length;
+        const totalRevenueVal = liveApps.reduce((sum, item) => item.status !== 'cancelled' ? sum + (item.amount || 500) : sum, 0);
+
+        setStats({
+          totalAppointments: total,
+          todayAppointments: todayCount,
+          pendingAppointments: pendingCount,
+          totalDoctors: 1,
+          totalPatients: new Set(liveApps.map(a => a.user?.id || a.user?._id || a.user?.name || a.user)).size || 1,
+          completedAppointments: completedCount,
+          cancelledAppointments: cancelledCount,
+          totalRevenue: `₹${totalRevenueVal.toLocaleString('en-IN')}`
+        });
       }
     } catch (err) {
       console.error('Error fetching dashboard metrics:', err);
@@ -112,7 +128,7 @@ const DoctorDashboard = () => {
             gap: '0.4rem'
           }}>
             <Calendar size={15} color="#0066FF" />
-            21 August 2025, Thursday
+            {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' })}
           </div>
 
           <button onClick={() => setIsModalOpen(true)} className="btn btn-primary btn-sm" style={{ padding: '0.45rem 0.85rem' }}>

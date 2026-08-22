@@ -262,13 +262,13 @@ router.get('/dashboard-stats', protect, async (req, res) => {
         const completedAppointmentsCount = await Appointment.countDocuments({ status: 'completed' });
         const cancelledAppointmentsCount = await Appointment.countDocuments({ status: 'cancelled' });
 
-        // Calculate Revenue from Appointments
+        // Calculate Revenue from non-cancelled Appointments (or completed)
         const revenueAgg = await Appointment.aggregate([
             { $match: { status: { $ne: 'cancelled' } } },
             { $group: { _id: null, total: { $sum: '$amount' } } }
         ]);
 
-        const rawRevenue = revenueAgg.length > 0 && revenueAgg[0].total > 0 ? revenueAgg[0].total : 124560;
+        const rawRevenue = revenueAgg.length > 0 ? revenueAgg[0].total : 0;
         const formattedRevenue = `₹${rawRevenue.toLocaleString('en-IN')}`;
 
         const latestAppointments = await Appointment.find()
@@ -282,13 +282,14 @@ router.get('/dashboard-stats', protect, async (req, res) => {
         res.json({
             success: true,
             stats: {
-                totalAppointments: totalAppointmentsCount || 1248,
-                todayAppointments: todayAppointmentsCount || 86,
-                pendingAppointments: pendingAppointmentsCount || 24,
-                totalDoctors: totalDoctorsCount || 56,
-                totalPatients: totalPatientsCount || 2356,
-                completedAppointments: completedAppointmentsCount || 1024,
-                cancelledAppointments: cancelledAppointmentsCount || 18,
+                totalAppointments: totalAppointmentsCount,
+                todayAppointments: todayAppointmentsCount,
+                pendingAppointments: pendingAppointmentsCount,
+                totalDoctors: totalDoctorsCount,
+                totalPatients: totalPatientsCount,
+                completedAppointments: completedAppointmentsCount,
+                cancelledAppointments: cancelledAppointmentsCount,
+                rawRevenue,
                 totalRevenue: formattedRevenue,
                 latestAppointments,
                 topDoctors: doctors
