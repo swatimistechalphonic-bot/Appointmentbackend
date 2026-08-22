@@ -32,34 +32,42 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+const AppLayout = () => {
+  return (
+    <div className="doctris-layout">
+      <Sidebar />
+      <div className="doctris-main-wrapper">
+        <Navbar />
+        <main className="page-content">
+          <Routes>
+            <Route path="/" element={<ProtectedRoute><DoctorDashboard /></ProtectedRoute>} />
+            <Route path="/appointments" element={<ProtectedRoute><PatientDashboard /></ProtectedRoute>} />
+            <Route path="/doctors" element={<ProtectedRoute><DoctorsPage /></ProtectedRoute>} />
+            <Route path="/patients" element={<ProtectedRoute><PatientsPage /></ProtectedRoute>} />
+            <Route path="/departments" element={<ProtectedRoute><AppsPage /></ProtectedRoute>} />
+            <Route path="/schedules" element={<ProtectedRoute><PatientDashboard /></ProtectedRoute>} />
+            <Route path="/payments" element={<ProtectedRoute><PharmacyPage /></ProtectedRoute>} />
+            <Route path="/reviews" element={<ProtectedRoute><DoctorsPage /></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute><ComponentsPage /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><ComponentsPage /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><DoctorsPage /></ProtectedRoute>} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
+      </div>
+    </div>
+  );
+};
+
 function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className="doctris-layout">
-          <Sidebar />
-          <div className="doctris-main-wrapper">
-            <Navbar />
-            <main className="page-content">
-              <Routes>
-                <Route path="/" element={<ProtectedRoute><DoctorDashboard /></ProtectedRoute>} />
-                <Route path="/appointments" element={<ProtectedRoute><PatientDashboard /></ProtectedRoute>} />
-                <Route path="/doctors" element={<ProtectedRoute><DoctorsPage /></ProtectedRoute>} />
-                <Route path="/patients" element={<ProtectedRoute><PatientsPage /></ProtectedRoute>} />
-                <Route path="/departments" element={<ProtectedRoute><AppsPage /></ProtectedRoute>} />
-                <Route path="/schedules" element={<ProtectedRoute><PatientDashboard /></ProtectedRoute>} />
-                <Route path="/payments" element={<ProtectedRoute><PharmacyPage /></ProtectedRoute>} />
-                <Route path="/reviews" element={<ProtectedRoute><DoctorsPage /></ProtectedRoute>} />
-                <Route path="/reports" element={<ProtectedRoute><ComponentsPage /></ProtectedRoute>} />
-                <Route path="/settings" element={<ProtectedRoute><ComponentsPage /></ProtectedRoute>} />
-                <Route path="/profile" element={<ProtectedRoute><DoctorsPage /></ProtectedRoute>} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </main>
-          </div>
-        </div>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/*" element={<AppLayout />} />
+        </Routes>
       </Router>
     </AuthProvider>
   );

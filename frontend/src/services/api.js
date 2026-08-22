@@ -44,4 +44,13 @@ export const appointmentApi = {
   deleteAppointment: (id) => api.delete(`/appointments/${id}`),
 };
 
+// Patient API endpoints
+export const patientApi = {
+  getAllPatients: (search) => api.get('/patients', { params: { search } }),
+  getPatientById: (id) => api.get(`/patients/${id}`),
+  createPatient: (data) => api.post('/patients', data),
+  updatePatient: (id, data) => api.put(`/patients/${id}`, data),
+  deletePatient: (id) => api.delete(`/patients/${id}`),
+};
+
 export default api;

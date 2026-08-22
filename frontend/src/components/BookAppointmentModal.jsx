@@ -34,9 +34,15 @@ const BookAppointmentModal = ({ isOpen, onClose, onBookingSuccess, preselectedDo
 
   const fetchDoctors = async () => {
     try {
-      const res = await authApi.getAllUsers();
-      if (res.data?.success) {
-        const doctorList = res.data.users.filter(u => u.role === 'doctor');
+      const res = await authApi.getDoctors();
+      if (res.data?.success && res.data.doctors?.length > 0) {
+        setDoctors(res.data.doctors);
+        if (!selectedDoctorId) {
+          setSelectedDoctorId(res.data.doctors[0]._id);
+        }
+      } else {
+        const usersRes = await authApi.getAllUsers();
+        const doctorList = usersRes.data?.users?.filter(u => u.role === 'doctor') || [];
         setDoctors(doctorList.length > 0 ? doctorList : mockDoctors);
         if (!selectedDoctorId && doctorList.length > 0) {
           setSelectedDoctorId(doctorList[0]._id);

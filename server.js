@@ -6,6 +6,7 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const connectDB = require('./db');
 const userRoutes = require('./routes/userRoutes');
 const appointmentRoutes = require('./routes/appointmentRoutes');
+const patientRoutes = require('./routes/patientRoutes');
 
 const app = express();
 
@@ -36,6 +37,16 @@ const swaggerOptions = {
                 description: 'Dynamic Current Host',
             },
         ],
+        components: {
+            securitySchemes: {
+                bearerAuth: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'JWT',
+                    description: 'Enter your JWT Bearer token to authorize and unlock protected API endpoints'
+                }
+            }
+        }
     },
     apis: ['./routes/*.js'],
 };
@@ -55,6 +66,7 @@ connectDB();
 // API Routes
 app.use('/api/users', userRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/patients', patientRoutes);
 
 // Default Route
 app.get('/', (req, res) => {

@@ -19,33 +19,52 @@ import {
 
 const DoctorDashboard = () => {
   const { user } = useAuth();
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [stats, setStats] = useState({
+    totalAppointments: '1,248',
+    todayAppointments: '86',
+    pendingAppointments: '24',
+    totalDoctors: '56',
+    totalPatients: '2,356',
+    completedAppointments: '1,024',
+    cancelledAppointments: '18',
+    totalRevenue: '₹1,24,560'
+  });
+
   const [appointments, setAppointments] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
-    fetchAppointments();
+    fetchDashboardData();
   }, []);
 
-  const fetchAppointments = async () => {
+  const fetchDashboardData = async () => {
     try {
-      const res = await appointmentApi.getAllAppointments();
-      if (res.data?.success) {
-        setAppointments(res.data.appointments);
+      const statsRes = await appointmentApi.getDashboardStats();
+      if (statsRes.data?.success && statsRes.data.stats) {
+        setStats(prev => ({
+          ...prev,
+          ...statsRes.data.stats
+        }));
+      }
+
+      const appRes = await appointmentApi.getAllAppointments();
+      if (appRes.data?.success) {
+        setAppointments(appRes.data.appointments);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Error fetching dashboard metrics:', err);
     }
   };
 
   const metricsData = [
-    { title: 'Total Appointments', value: '1,248', trend: '12.5%', isUp: true, icon: Calendar, cardBg: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', border: '#BFDBFE', iconBg: '#0066FF', valColor: '#1E40AF', labelColor: '#3B82F6' },
-    { title: "Today's Appointments", value: '86', trend: '8.4%', isUp: true, icon: Clock, cardBg: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', border: '#A7F3D0', iconBg: '#10B981', valColor: '#065F46', labelColor: '#059669' },
-    { title: 'Pending Appointments', value: '24', trend: '3.2%', isUp: false, icon: Hourglass, cardBg: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)', border: '#FDE68A', iconBg: '#F59E0B', valColor: '#92400E', labelColor: '#D97706' },
-    { title: 'Total Doctors', value: '56', trend: '4.7%', isUp: true, icon: UserCheck, cardBg: 'linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%)', border: '#DDD6FE', iconBg: '#8B5CF6', valColor: '#6B21A8', labelColor: '#7C3AED' },
-    { title: 'Total Patients', value: '2,356', trend: '10.3%', isUp: true, icon: Users, cardBg: 'linear-gradient(135deg, #FFE4E6 0%, #FECDD3 100%)', border: '#FECDD3', iconBg: '#F43F5E', valColor: '#9F1239', labelColor: '#E11D48' },
-    { title: 'Completed Appointments', value: '1,024', trend: '15.6%', isUp: true, icon: CheckCircle2, cardBg: 'linear-gradient(135deg, #E0F2FE 0%, #BAE6FD 100%)', border: '#BAE6FD', iconBg: '#06B6D4', valColor: '#075985', labelColor: '#0284C7' },
-    { title: 'Cancelled Appointments', value: '18', trend: '2.1%', isUp: false, icon: XCircle, cardBg: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)', border: '#FECACA', iconBg: '#EF4444', valColor: '#991B1B', labelColor: '#DC2626' },
-    { title: 'Total Revenue', value: '₹1,24,560', trend: '18.6%', isUp: true, icon: DollarSign, cardBg: 'linear-gradient(135deg, #FEF9C3 0%, #FEF08A 100%)', border: '#FEF08A', iconBg: '#D97706', valColor: '#854D0E', labelColor: '#B45309' },
+    { title: 'Total Appointments', value: stats.totalAppointments, trend: '12.5%', isUp: true, icon: Calendar, cardBg: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', border: '#BFDBFE', iconBg: '#0066FF', valColor: '#1E40AF', labelColor: '#3B82F6' },
+    { title: "Today's Appointments", value: stats.todayAppointments, trend: '8.4%', isUp: true, icon: Clock, cardBg: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', border: '#A7F3D0', iconBg: '#10B981', valColor: '#065F46', labelColor: '#059669' },
+    { title: 'Pending Appointments', value: stats.pendingAppointments, trend: '3.2%', isUp: false, icon: Hourglass, cardBg: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)', border: '#FDE68A', iconBg: '#F59E0B', valColor: '#92400E', labelColor: '#D97706' },
+    { title: 'Total Doctors', value: stats.totalDoctors, trend: '4.7%', isUp: true, icon: UserCheck, cardBg: 'linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%)', border: '#DDD6FE', iconBg: '#8B5CF6', valColor: '#6B21A8', labelColor: '#7C3AED' },
+    { title: 'Total Patients', value: stats.totalPatients, trend: '10.3%', isUp: true, icon: Users, cardBg: 'linear-gradient(135deg, #FFE4E6 0%, #FECDD3 100%)', border: '#FECDD3', iconBg: '#F43F5E', valColor: '#9F1239', labelColor: '#E11D48' },
+    { title: 'Completed Appointments', value: stats.completedAppointments, trend: '15.6%', isUp: true, icon: CheckCircle2, cardBg: 'linear-gradient(135deg, #E0F2FE 0%, #BAE6FD 100%)', border: '#BAE6FD', iconBg: '#06B6D4', valColor: '#075985', labelColor: '#0284C7' },
+    { title: 'Cancelled Appointments', value: stats.cancelledAppointments, trend: '2.1%', isUp: false, icon: XCircle, cardBg: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)', border: '#FECACA', iconBg: '#EF4444', valColor: '#991B1B', labelColor: '#DC2626' },
+    { title: 'Total Revenue', value: stats.totalRevenue, trend: '18.6%', isUp: true, icon: DollarSign, cardBg: 'linear-gradient(135deg, #FEF9C3 0%, #FEF08A 100%)', border: '#FEF08A', iconBg: '#D97706', valColor: '#854D0E', labelColor: '#B45309' },
   ];
 
   const screenshotPatients = [
@@ -259,7 +278,7 @@ const DoctorDashboard = () => {
       <BookAppointmentModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onBookingSuccess={fetchAppointments}
+        onBookingSuccess={fetchDashboardData}
       />
     </div>
   );

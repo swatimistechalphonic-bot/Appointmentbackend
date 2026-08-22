@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { protect } = require('../middleware/auth');
 
 // Secret for JWT Token (fallback if not in env)
 const JWT_SECRET = process.env.JWT_SECRET || 'appointment_app_secret_key_123';
@@ -308,15 +309,44 @@ router.post('/verify-otp', async (req, res) => {
 
 /**
  * @swagger
+ * /api/users/profile:
+ *   get:
+ *     summary: Get current authenticated user profile
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Authenticated user profile details
+ *       401:
+ *         description: Not authorized, token missing or invalid
+ */
+router.get('/profile', protect, async (req, res) => {
+    try {
+        res.json({
+            success: true,
+            user: req.user
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * @swagger
  * /api/users:
  *   get:
- *     summary: Get all users
+ *     summary: Get all users (Protected)
  *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: List of all users
+ *       401:
+ *         description: Not authorized
  */
-router.get('/', async (req, res) => {
+router.get('/', protect, async (req, res) => {
     try {
         const users = await User.find().select('-password');
         res.json({ success: true, count: users.length, users });
@@ -349,8 +379,10 @@ router.get('/doctors', async (req, res) => {
  * @swagger
  * /api/users/{id}:
  *   get:
- *     summary: Get user by ID
+ *     summary: Get user by ID (Protected)
  *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -360,10 +392,12 @@ router.get('/doctors', async (req, res) => {
  *     responses:
  *       200:
  *         description: User details
+ *       401:
+ *         description: Not authorized
  *       404:
  *         description: User not found
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id', protect, async (req, res) => {
     try {
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
             return res.status(400).json({ success: false, message: 'Invalid User ID format' });
@@ -382,8 +416,10 @@ router.get('/:id', async (req, res) => {
  * @swagger
  * /api/users/{id}:
  *   put:
- *     summary: Update user details
+ *     summary: Update user details (Protected)
  *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -407,10 +443,12 @@ router.get('/:id', async (req, res) => {
  *     responses:
  *       200:
  *         description: User updated successfully
+ *       401:
+ *         description: Not authorized
  *       404:
  *         description: User not found
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id', protect, async (req, res) => {
     try {
         const { name, phone, role, password } = req.body;
         const updateData = {};
@@ -448,8 +486,10 @@ router.put('/:id', async (req, res) => {
  * @swagger
  * /api/users/{id}:
  *   delete:
- *     summary: Delete user
+ *     summary: Delete user (Protected)
  *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -459,10 +499,12 @@ router.put('/:id', async (req, res) => {
  *     responses:
  *       200:
  *         description: User deleted successfully
+ *       401:
+ *         description: Not authorized
  *       404:
  *         description: User not found
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', protect, async (req, res) => {
     try {
         const user = await User.findByIdAndDelete(req.params.id);
         if (!user) {

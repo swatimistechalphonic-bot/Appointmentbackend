@@ -14,9 +14,12 @@ const DoctorsPage = () => {
   const fetchDoctors = async () => {
     setLoading(true);
     try {
-      const res = await authApi.getAllUsers();
-      if (res.data?.success) {
-        const docList = res.data.users.filter(u => u.role === 'doctor');
+      const res = await authApi.getDoctors();
+      if (res.data?.success && res.data.doctors?.length > 0) {
+        setDoctors(res.data.doctors);
+      } else {
+        const usersRes = await authApi.getAllUsers();
+        const docList = usersRes.data?.users?.filter(u => u.role === 'doctor') || [];
         setDoctors(docList.length > 0 ? docList : mockDoctors);
       }
     } catch (err) {
