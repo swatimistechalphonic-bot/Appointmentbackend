@@ -101,4 +101,14 @@ export const settingApi = {
   updateSettings: (data) => api.put('/settings', data),
 };
 
+// Payment Management API endpoints
+export const paymentApi = {
+  getStats: () => api.get('/payments/stats'),
+  getAllPayments: (params) => api.get('/payments', { params }),
+  getPaymentById: (id) => api.get(`/payments/${id}`),
+  createPayment: (data) => api.post('/payments', data),
+  updatePayment: (id, data) => api.put(`/payments/${id}`, data),
+  deletePayment: (id) => api.delete(`/payments/${id}`),
+};
+
 export default api;

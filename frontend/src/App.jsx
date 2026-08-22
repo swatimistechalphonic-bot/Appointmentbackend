@@ -15,6 +15,7 @@ import SchedulesPage from './pages/SchedulesPage';
 import ReportsPage from './pages/ReportsPage';
 import ReviewsPage from './pages/ReviewsPage';
 import PharmacyPage from './pages/PharmacyPage';
+import PaymentsPage from './pages/PaymentsPage';
 import BlogsPage from './pages/BlogsPage';
 import AppsPage from './pages/AppsPage';
 import SettingsPage from './pages/SettingsPage';
@@ -53,7 +54,7 @@ const AppLayout = () => {
             <Route path="/messages" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
             <Route path="/departments" element={<ProtectedRoute><DepartmentsPage /></ProtectedRoute>} />
             <Route path="/schedules" element={<ProtectedRoute><SchedulesPage /></ProtectedRoute>} />
-            <Route path="/payments" element={<ProtectedRoute><PharmacyPage /></ProtectedRoute>} />
+            <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
             <Route path="/reviews" element={<ProtectedRoute><ReviewsPage /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
