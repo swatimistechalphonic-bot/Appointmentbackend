@@ -271,6 +271,29 @@ router.get('/dashboard-stats', protect, async (req, res) => {
         const rawRevenue = revenueAgg.length > 0 ? revenueAgg[0].total : 0;
         const formattedRevenue = `₹${rawRevenue.toLocaleString('en-IN')}`;
 
+        // Calculate dynamic appointment workflow stats (grouped by date)
+        const appointmentWorkflow = await Appointment.aggregate([
+            {
+                $group: {
+                    _id: "$date",
+                    total: { $sum: 1 },
+                    completed: {
+                        $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] }
+                    },
+                    cancelled: {
+                        $sum: { $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0] }
+                    },
+                    pending: {
+                        $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] }
+                    },
+                    revenue: {
+                        $sum: { $cond: [{ $ne: ["$status", "cancelled"] }, "$amount", 0] }
+                    }
+                }
+            },
+            { $sort: { _id: 1 } }
+        ]);
+
         const latestAppointments = await Appointment.find()
             .populate('user', 'name email phone')
             .populate('doctor', 'name email phone role')
@@ -291,6 +314,7 @@ router.get('/dashboard-stats', protect, async (req, res) => {
                 cancelledAppointments: cancelledAppointmentsCount,
                 rawRevenue,
                 totalRevenue: formattedRevenue,
+                appointmentWorkflow,
                 latestAppointments,
                 topDoctors: doctors
             }

@@ -101,6 +101,21 @@ const DoctorDashboard = () => {
     avatar: `https://images.unsplash.com/photo-${1500000000000 + idx}?w=100&auto=format&fit=crop&q=80`
   })) : screenshotPatients;
 
+  const totalVal = Number(stats.totalAppointments) || appointments.length || 0;
+  const completedVal = Number(stats.completedAppointments) || appointments.filter(a => a.status === 'completed').length || 0;
+  const cancelledVal = Number(stats.cancelledAppointments) || appointments.filter(a => a.status === 'cancelled').length || 0;
+
+  const maxVal = Math.max(totalVal, completedVal, cancelledVal, 4);
+
+  const getYCoord = (val) => {
+    const ratio = Math.min(val / maxVal, 1);
+    return 120 - Math.round(ratio * 95);
+  };
+
+  const yTotal = getYCoord(totalVal);
+  const yComp = getYCoord(completedVal);
+  const yCanc = getYCoord(cancelledVal);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', gap: '0.75rem' }}>
       {/* Welcome Banner */}
@@ -182,37 +197,31 @@ const DoctorDashboard = () => {
               <line x1="35" y1="85" x2="480" y2="85" stroke="#F1F5F9" strokeWidth="1" />
               <line x1="35" y1="120" x2="480" y2="120" stroke="#F1F5F9" strokeWidth="1" />
 
-              <text x="25" y="18" fill="#94A3B8" fontSize="10" textAnchor="end">800</text>
-              <text x="25" y="53" fill="#94A3B8" fontSize="10" textAnchor="end">600</text>
-              <text x="25" y="88" fill="#94A3B8" fontSize="10" textAnchor="end">400</text>
-              <text x="25" y="123" fill="#94A3B8" fontSize="10" textAnchor="end">200</text>
+              <text x="28" y="18" fill="#94A3B8" fontSize="10" textAnchor="end">{maxVal}</text>
+              <text x="28" y="53" fill="#94A3B8" fontSize="10" textAnchor="end">{Math.round(maxVal * 0.75)}</text>
+              <text x="28" y="88" fill="#94A3B8" fontSize="10" textAnchor="end">{Math.round(maxVal * 0.5)}</text>
+              <text x="28" y="123" fill="#94A3B8" fontSize="10" textAnchor="end">{Math.round(maxVal * 0.25)}</text>
 
-              <path d="M 45 110 Q 85 80 115 90 T 185 40 T 255 75 T 325 20 T 395 40 T 465 15" fill="none" stroke="#0066FF" strokeWidth="2.5" />
-              <circle cx="45" cy="110" r="3.5" fill="#0066FF" />
-              <circle cx="115" cy="90" r="3.5" fill="#0066FF" />
-              <circle cx="185" cy="40" r="3.5" fill="#0066FF" />
-              <circle cx="255" cy="75" r="3.5" fill="#0066FF" />
-              <circle cx="325" cy="20" r="3.5" fill="#0066FF" />
-              <circle cx="395" cy="40" r="3.5" fill="#0066FF" />
-              <circle cx="465" cy="15" r="3.5" fill="#0066FF" />
+              {/* Total Appointments Spline (Blue) */}
+              <path d={`M 45 120 Q 115 ${yTotal - 5} 185 ${yTotal} T 325 ${yTotal} T 465 ${yTotal}`} fill="none" stroke="#0066FF" strokeWidth="2.5" />
+              <circle cx="45" cy="120" r="3.5" fill="#0066FF" />
+              <circle cx="185" cy={yTotal} r="3.5" fill="#0066FF" />
+              <circle cx="325" cy={yTotal} r="3.5" fill="#0066FF" />
+              <circle cx="465" cy={yTotal} r="3.5" fill="#0066FF" />
 
-              <path d="M 45 125 Q 85 110 115 100 T 185 75 T 255 95 T 325 60 T 395 75 T 465 45" fill="none" stroke="#10B981" strokeWidth="2" />
-              <circle cx="45" cy="125" r="3" fill="#10B981" />
-              <circle cx="115" cy="100" r="3" fill="#10B981" />
-              <circle cx="185" cy="75" r="3" fill="#10B981" />
-              <circle cx="255" cy="95" r="3" fill="#10B981" />
-              <circle cx="325" cy="60" r="3" fill="#10B981" />
-              <circle cx="395" cy="75" r="3" fill="#10B981" />
-              <circle cx="465" cy="45" r="3" fill="#10B981" />
+              {/* Completed Appointments Spline (Green) */}
+              <path d={`M 45 122 Q 115 ${yComp} 185 ${yComp} T 325 ${yComp} T 465 ${yComp}`} fill="none" stroke="#10B981" strokeWidth="2" />
+              <circle cx="45" cy="122" r="3" fill="#10B981" />
+              <circle cx="185" cy={yComp} r="3" fill="#10B981" />
+              <circle cx="325" cy={yComp} r="3" fill="#10B981" />
+              <circle cx="465" cy={yComp} r="3" fill="#10B981" />
 
-              <path d="M 45 135 Q 85 130 115 125 T 185 128 T 255 118 T 325 110 T 395 120 T 465 115" fill="none" stroke="#F43F5E" strokeWidth="2" />
-              <circle cx="45" cy="135" r="3" fill="#F43F5E" />
-              <circle cx="115" cy="125" r="3" fill="#F43F5E" />
-              <circle cx="185" cy="128" r="3" fill="#F43F5E" />
-              <circle cx="255" cy="118" r="3" fill="#F43F5E" />
-              <circle cx="325" cy="110" r="3" fill="#F43F5E" />
-              <circle cx="395" cy="120" r="3" fill="#F43F5E" />
-              <circle cx="465" cy="115" r="3" fill="#F43F5E" />
+              {/* Cancelled Appointments Spline (Red) */}
+              <path d={`M 45 124 Q 115 ${yCanc} 185 ${yCanc} T 325 ${yCanc} T 465 ${yCanc}`} fill="none" stroke="#F43F5E" strokeWidth="2" />
+              <circle cx="45" cy="124" r="3" fill="#F43F5E" />
+              <circle cx="185" cy={yCanc} r="3" fill="#F43F5E" />
+              <circle cx="325" cy={yCanc} r="3" fill="#F43F5E" />
+              <circle cx="465" cy={yCanc} r="3" fill="#F43F5E" />
             </svg>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: '30px', paddingRight: '10px', fontSize: '0.72rem', color: '#94A3B8', marginTop: '0.1rem' }}>
