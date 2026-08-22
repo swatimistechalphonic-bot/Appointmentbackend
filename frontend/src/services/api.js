@@ -32,6 +32,9 @@ export const authApi = {
   changePassword: (data) => api.put('/users/change-password', data),
   getAllUsers: () => api.get('/users'),
   getDoctors: () => api.get('/users/doctors'),
+  createDoctor: (data) => api.post('/users/doctors', data),
+  updateDoctor: (id, data) => api.put(`/users/doctors/${id}`, data),
+  deleteDoctor: (id) => api.delete(`/users/doctors/${id}`),
   getUserById: (id) => api.get(`/users/${id}`),
 };
 

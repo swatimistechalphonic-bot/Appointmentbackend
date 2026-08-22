@@ -497,6 +497,205 @@ router.get('/doctors', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/users/doctors:
+ *   post:
+ *     summary: Add a new Doctor account (Protected)
+ *     tags: [Doctors]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - email
+ *               - password
+ *             properties:
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               specialization:
+ *                 type: string
+ *               bio:
+ *                 type: string
+ *               avatar:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Doctor account created successfully
+ *       400:
+ *         description: Email already registered or missing required fields
+ */
+router.post('/doctors', protect, async (req, res) => {
+    try {
+        const { name, email, password, phone, specialization, bio, avatar, address } = req.body;
+
+        if (!name || !email || !password) {
+            return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
+        }
+
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ success: false, message: 'Email is already registered' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        const doctor = new User({
+            name,
+            email,
+            password: hashedPassword,
+            phone: phone || '',
+            role: 'doctor',
+            specialization: specialization || 'General Physician',
+            bio: bio || '',
+            avatar: avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150',
+            address: address || ''
+        });
+
+        const savedDoctor = await doctor.save();
+        const doctorResponse = savedDoctor.toObject();
+        delete doctorResponse.password;
+
+        res.status(201).json({
+            success: true,
+            message: 'Doctor account created successfully!',
+            doctor: doctorResponse
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/users/doctors/{id}:
+ *   put:
+ *     summary: Update a Doctor profile (Protected)
+ *     tags: [Doctors]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               specialization:
+ *                 type: string
+ *               bio:
+ *                 type: string
+ *               avatar:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Doctor profile updated successfully
+ *       404:
+ *         description: Doctor not found
+ */
+router.put('/doctors/:id', protect, async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ success: false, message: 'Invalid Doctor ID format' });
+        }
+
+        const { name, phone, specialization, bio, avatar, address } = req.body;
+        const updateData = {};
+
+        if (name !== undefined) updateData.name = name;
+        if (phone !== undefined) updateData.phone = phone;
+        if (specialization !== undefined) updateData.specialization = specialization;
+        if (bio !== undefined) updateData.bio = bio;
+        if (avatar !== undefined) updateData.avatar = avatar;
+        if (address !== undefined) updateData.address = address;
+
+        const updatedDoctor = await User.findByIdAndUpdate(
+            req.params.id,
+            { $set: updateData },
+            { new: true, runValidators: true }
+        ).select('-password');
+
+        if (!updatedDoctor) {
+            return res.status(404).json({ success: false, message: 'Doctor not found' });
+        }
+
+        res.json({
+            success: true,
+            message: 'Doctor profile updated successfully!',
+            doctor: updatedDoctor
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/users/doctors/{id}:
+ *   delete:
+ *     summary: Delete a Doctor record (Protected)
+ *     tags: [Doctors]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Doctor deleted successfully
+ *       404:
+ *         description: Doctor not found
+ */
+router.delete('/doctors/:id', protect, async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ success: false, message: 'Invalid Doctor ID format' });
+        }
+
+        const doctor = await User.findByIdAndDelete(req.params.id);
+
+        if (!doctor) {
+            return res.status(404).json({ success: false, message: 'Doctor not found' });
+        }
+
+        res.json({
+            success: true,
+            message: 'Doctor deleted successfully'
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 
 /**
  * @swagger
