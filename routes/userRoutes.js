@@ -323,9 +323,132 @@ router.post('/verify-otp', async (req, res) => {
  */
 router.get('/profile', protect, async (req, res) => {
     try {
+        const user = await User.findById(req.user._id || req.user.id).select('-password');
         res.json({
             success: true,
-            user: req.user
+            user: user || req.user
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/users/profile:
+ *   put:
+ *     summary: Update current authenticated user profile (Protected)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               bio:
+ *                 type: string
+ *               specialization:
+ *                 type: string
+ *               avatar:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Profile updated successfully
+ *       401:
+ *         description: Not authorized
+ */
+router.put('/profile', protect, async (req, res) => {
+    try {
+        const { name, phone, bio, specialization, avatar, address } = req.body;
+        const updateData = {};
+
+        if (name !== undefined) updateData.name = name;
+        if (phone !== undefined) updateData.phone = phone;
+        if (bio !== undefined) updateData.bio = bio;
+        if (specialization !== undefined) updateData.specialization = specialization;
+        if (avatar !== undefined) updateData.avatar = avatar;
+        if (address !== undefined) updateData.address = address;
+
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user._id || req.user.id,
+            { $set: updateData },
+            { new: true, runValidators: true }
+        ).select('-password');
+
+        res.json({
+            success: true,
+            message: 'Profile updated successfully!',
+            user: updatedUser
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/users/change-password:
+ *   put:
+ *     summary: Change current authenticated user password (Protected)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - oldPassword
+ *               - newPassword
+ *             properties:
+ *               oldPassword:
+ *                 type: string
+ *               newPassword:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Password updated successfully
+ *       400:
+ *         description: Incorrect old password or missing fields
+ *       401:
+ *         description: Not authorized
+ */
+router.put('/change-password', protect, async (req, res) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+
+        if (!oldPassword || !newPassword) {
+            return res.status(400).json({ success: false, message: 'Both oldPassword and newPassword are required' });
+        }
+
+        const user = await User.findById(req.user._id || req.user.id);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        const isMatch = await bcrypt.compare(oldPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ success: false, message: 'Incorrect current password' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+        await user.save();
+
+        res.json({
+            success: true,
+            message: 'Password changed successfully!'
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

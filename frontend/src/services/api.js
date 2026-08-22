@@ -21,12 +21,15 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// User Authentication API endpoints
+// User Authentication & Profile API endpoints
 export const authApi = {
   login: (data) => api.post('/users/login', data),
   register: (data) => api.post('/users/register', data),
   sendOtp: (phone) => api.post('/users/send-otp', { phone }),
   verifyOtp: (data) => api.post('/users/verify-otp', data),
+  getProfile: () => api.get('/users/profile'),
+  updateProfile: (data) => api.put('/users/profile', data),
+  changePassword: (data) => api.put('/users/change-password', data),
   getAllUsers: () => api.get('/users'),
   getDoctors: () => api.get('/users/doctors'),
   getUserById: (id) => api.get(`/users/${id}`),

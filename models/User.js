@@ -27,6 +27,22 @@ const userSchema = new mongoose.Schema(
             enum: ['user', 'doctor', 'admin'],
             default: 'user'
         },
+        bio: {
+            type: String,
+            default: ''
+        },
+        specialization: {
+            type: String,
+            default: ''
+        },
+        avatar: {
+            type: String,
+            default: ''
+        },
+        address: {
+            type: String,
+            default: ''
+        },
         otp: {
             type: String,
             default: null
