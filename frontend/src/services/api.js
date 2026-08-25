@@ -48,6 +48,16 @@ export const appointmentApi = {
   getAppointmentById: (id) => api.get(`/appointments/${id}`),
   updateAppointment: (id, data) => api.put(`/appointments/${id}`, data),
   deleteAppointment: (id) => api.delete(`/appointments/${id}`),
+  // Scheduled Time Booking APIs
+  getAvailableSlots: (params) => api.get('/appointments/available-slots', { params }),
+  bookScheduledAppointment: (data) => api.post('/appointments/book-scheduled', data),
+  // Doctor Schedules & Shift Timings APIs
+  getDoctorSchedule: (doctorId) => api.get(`/appointments/doctor-schedules/${doctorId}`),
+  saveDoctorSchedule: (data) => api.post('/appointments/doctor-schedules', data),
+  // OPD Live Queue Flow APIs
+  getLiveQueue: (params) => api.get('/appointments/queue/live', { params }),
+  checkInPatient: (appointmentId) => api.post('/appointments/queue/check-in', { appointmentId }),
+  updateQueueStatus: (appointmentId, data) => api.put(`/appointments/queue/${appointmentId}/status`, data),
 };
 
 // Patient API endpoints

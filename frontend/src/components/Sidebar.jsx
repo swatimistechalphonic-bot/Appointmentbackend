@@ -16,14 +16,27 @@ import {
   User,
   LogOut,
   ShieldAlert,
-  HeartPulse
+  HeartPulse,
+  ClipboardList,
+  FolderHeart,
+  FileSpreadsheet,
+  Video,
+  Stethoscope,
+  Activity,
+  FileText,
+  Bell,
+  ShieldCheck,
+  Bed,
+  UserPlus,
+  Syringe,
+  FileCheck2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Sidebar = () => {
   const location = useLocation();
   const activePath = location.pathname;
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [logoError, setLogoError] = useState(false);
   const [appSettings, setAppSettings] = useState({
     appName: localStorage.getItem('docadmin_app_name') || 'DocAdmin',
@@ -68,17 +81,50 @@ const Sidebar = () => {
     }
   };
 
+  const permissions = {
+    superadmin: ['*', 'logout'],
+    admin: ['dashboard', 'appointments', 'doctors', 'patients', 'schedules', 'queuemanagement', 'medicalrecords', 'prescriptions', 'messages', 'telemedicine', 'departments', 'services', 'paymentsbilling', 'labdiagnostics', 'documents', 'reviews', 'reportsanalytics', 'staffroles', 'auditlogs', 'settings', 'adminprofile', 'bedward', 'referrals', 'vaccinations', 'dischargesummaries', 'logout'],
+    doctor: ['dashboard', 'appointments', 'patients', 'medicalrecords', 'prescriptions', 'messages', 'schedules', 'documents', 'staffroles', 'auditlogs', 'settings', 'adminprofile', 'bedward', 'referrals', 'vaccinations', 'dischargesummaries', 'logout'],
+    receptionist: ['dashboard', 'appointments', 'patients', 'doctors', 'schedules', 'paymentsbilling', 'documents', 'staffroles', 'auditlogs', 'settings', 'adminprofile', 'bedward', 'referrals', 'vaccinations', 'dischargesummaries', 'logout'],
+    nurse: ['dashboard', 'appointments', 'patients', 'medicalrecords', 'prescriptions', 'messages', 'telemedicine', 'labdiagnostics', 'documents', 'staffroles', 'auditlogs', 'settings', 'adminprofile', 'bedward', 'referrals', 'vaccinations', 'dischargesummaries', 'logout'],
+    labstaff: ['dashboard', 'patients', 'messages', 'labdiagnostics', 'documents', 'staffroles', 'auditlogs', 'settings', 'adminprofile', 'bedward', 'referrals', 'vaccinations', 'dischargesummaries', 'logout'],
+    accountant: ['dashboard', 'messages', 'paymentsbilling', 'reportsanalytics', 'documents', 'staffroles', 'auditlogs', 'settings', 'adminprofile', 'bedward', 'referrals', 'vaccinations', 'dischargesummaries', 'logout'],
+    user: ['dashboard', 'appointments', 'doctors', 'messages', 'reviews', 'documents', 'staffroles', 'auditlogs', 'settings', 'adminprofile', 'bedward', 'referrals', 'vaccinations', 'dischargesummaries', 'logout'],
+    patient: ['dashboard', 'appointments', 'doctors', 'messages', 'reviews', 'documents', 'staffroles', 'auditlogs', 'settings', 'adminprofile', 'bedward', 'referrals', 'vaccinations', 'dischargesummaries', 'logout']
+  };
+
+  const roleKey = user?.role ? user.role.toLowerCase().replace(/\s+/g, '') : 'admin';
+
+  const canAccess = (itemName) => {
+    const allowed = permissions[roleKey] || permissions['admin'];
+    const key = itemName.toLowerCase().replace('&', '').replace(/\s+/g, '');
+    return allowed.includes('*') || allowed.includes(key);
+  };
+
   const menuItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Appointments', path: '/appointments', icon: Calendar },
     { name: 'Doctors', path: '/doctors', icon: UserCheck },
     { name: 'Patients', path: '/patients', icon: Users },
-    { name: 'Messages', path: '/messages', icon: MessageSquare },
-    { name: 'Departments', path: '/departments', icon: Building2 },
     { name: 'Schedules', path: '/schedules', icon: Clock },
-    { name: 'Payments', path: '/payments', icon: CreditCard },
+    { name: 'Queue Management', path: '/queue', icon: ClipboardList },
+    { name: 'Medical Records', path: '/records', icon: FolderHeart },
+    { name: 'Prescriptions', path: '/prescriptions', icon: FileSpreadsheet },
+    { name: 'Messages', path: '/messages', icon: MessageSquare },
+    { name: 'Telemedicine', path: '/telemedicine', icon: Video },
+    { name: 'Departments', path: '/departments', icon: Building2 },
+    { name: 'Services', path: '/services', icon: Stethoscope },
+    { name: 'Payments & Billing', path: '/payments', icon: CreditCard },
+    { name: 'Lab & Diagnostics', path: '/lab', icon: Activity },
+    { name: 'Documents', path: '/documents', icon: FileText },
+    { name: 'Bed & Ward', path: '/beds', icon: Bed },
+    { name: 'Referrals', path: '/referrals', icon: UserPlus },
+    { name: 'Vaccinations', path: '/vaccinations', icon: Syringe },
+    { name: 'Discharge Summaries', path: '/discharge-summaries', icon: FileCheck2 },
     { name: 'Reviews', path: '/reviews', icon: Star },
-    { name: 'Reports', path: '/reports', icon: BarChart3 },
+    { name: 'Reports & Analytics', path: '/reports', icon: BarChart3 },
+    { name: 'Staff & Roles', path: '/staff', icon: ShieldAlert },
+    { name: 'Audit Logs', path: '/logs', icon: ShieldCheck },
     { name: 'Settings', path: '/settings', icon: Settings },
     { name: 'Admin Profile', path: '/profile', icon: User },
   ];
@@ -110,24 +156,26 @@ const Sidebar = () => {
       </Link>
 
       {/* Navigation Links matching screenshot */}
-      <div className="sidebar-menu">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activePath === item.path || (item.path === '/' && activePath === '');
+      <div className="sidebar-menu" style={{ overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+        {menuItems
+          .filter((item) => canAccess(item.name))
+          .map((item) => {
+            const Icon = item.icon;
+            const isActive = activePath === item.path || (item.path === '/' && activePath === '');
 
-          return (
-            <Link
-              key={item.name}
-              to={item.path}
-              className={`menu-item ${isActive ? 'active' : ''}`}
-            >
-              <div className="menu-item-left">
-                <Icon size={19} />
-                <span>{item.name}</span>
-              </div>
-            </Link>
-          );
-        })}
+            return (
+              <Link
+                key={item.name}
+                to={item.path}
+                className={`menu-item ${isActive ? 'active' : ''}`}
+              >
+                <div className="menu-item-left">
+                  <Icon size={19} />
+                  <span>{item.name}</span>
+                </div>
+              </Link>
+            );
+          })}
 
         <div className="sidebar-divider" />
 

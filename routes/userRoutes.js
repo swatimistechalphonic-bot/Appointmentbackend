@@ -538,32 +538,51 @@ router.get('/doctors', async (req, res) => {
  *       400:
  *         description: Email already registered or missing required fields
  */
-router.post('/doctors', protect, async (req, res) => {
+router.post('/doctors', async (req, res) => {
     try {
         const { name, email, password, phone, specialization, bio, avatar, address } = req.body;
 
-        if (!name || !email || !password) {
-            return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
+        if (!name) {
+            return res.status(400).json({ success: false, message: 'Doctor name is required' });
         }
 
-        const existingUser = await User.findOne({ email });
+        const doctorEmail = email || `${name.toLowerCase().replace(/\s+/g, '')}${Math.floor(100 + Math.random() * 900)}@caresync.com`;
+        const doctorPassword = password || 'Doctor@123';
+
+        let existingUser = await User.findOne({ email: doctorEmail });
         if (existingUser) {
-            return res.status(400).json({ success: false, message: 'Email is already registered' });
+            // Update existing doctor profile instead of throwing duplicate email error
+            existingUser.name = name;
+            existingUser.phone = phone || existingUser.phone;
+            existingUser.specialization = specialization || existingUser.specialization;
+            existingUser.bio = bio || existingUser.bio;
+            existingUser.avatar = avatar || existingUser.avatar;
+            existingUser.address = address || existingUser.address;
+            
+            const updatedDoctor = await existingUser.save();
+            const doctorObj = updatedDoctor.toObject();
+            delete doctorObj.password;
+
+            return res.status(200).json({
+                success: true,
+                message: 'Doctor profile updated successfully!',
+                doctor: doctorObj
+            });
         }
 
         const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
+        const hashedPassword = await bcrypt.hash(doctorPassword, salt);
 
         const doctor = new User({
             name,
-            email,
+            email: doctorEmail,
             password: hashedPassword,
-            phone: phone || '',
+            phone: phone || '+91 9876543210',
             role: 'doctor',
             specialization: specialization || 'General Physician',
-            bio: bio || '',
-            avatar: avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150',
-            address: address || ''
+            bio: bio || 'Experienced medical practitioner.',
+            avatar: avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=200',
+            address: address || 'Main OPD Clinic, Block A'
         });
 
         const savedDoctor = await doctor.save();

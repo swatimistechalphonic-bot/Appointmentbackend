@@ -68,6 +68,11 @@ connectDB();
 // Microservices Gateway API Routes
 registerMicroservices(app);
 
+// Core Route Mounts (Fallback & Direct Resolution)
+app.use('/api/users', userRoutes);
+app.use('/api/appointments', appointmentRoutes);
+app.use('/api/patients', patientRoutes);
+
 // Default Route
 app.get('/', (req, res) => {
     res.json({ message: 'Appointment Backend API is running successfully!' });

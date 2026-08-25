@@ -14,7 +14,8 @@ import {
   TrendingUp,
   TrendingDown,
   MoreVertical,
-  PlusCircle
+  PlusCircle,
+  ShieldAlert
 } from 'lucide-react';
 
 const DoctorDashboard = () => {
@@ -32,6 +33,53 @@ const DoctorDashboard = () => {
 
   const [appointments, setAppointments] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeMenuId, setActiveMenuId] = useState(null);
+
+  // Close 3-dots dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.action-dropdown-container')) {
+        setActiveMenuId(null);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const handleUpdateStatus = async (id, newStatus) => {
+    try {
+      if (typeof id === 'number' || String(id).length < 12) {
+        alert(`Status updated to ${newStatus} (Mock)`);
+        setActiveMenuId(null);
+        return;
+      }
+      await appointmentApi.updateAppointment(id, { status: newStatus });
+      fetchDashboardData();
+      setActiveMenuId(null);
+    } catch (err) {
+      console.error('Error updating appointment status:', err);
+      alert('Failed to update appointment status: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const handleDeleteAppointment = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this appointment?")) {
+      return;
+    }
+    try {
+      if (typeof id === 'number' || String(id).length < 12) {
+        alert("Deleted successfully (Mock)");
+        setActiveMenuId(null);
+        return;
+      }
+      await appointmentApi.deleteAppointment(id);
+      fetchDashboardData();
+      setActiveMenuId(null);
+    } catch (err) {
+      console.error('Error deleting appointment:', err);
+      alert('Failed to delete appointment: ' + (err.response?.data?.message || err.message));
+    }
+  };
 
   useEffect(() => {
     fetchDashboardData();
@@ -81,6 +129,10 @@ const DoctorDashboard = () => {
     { title: 'Completed Appointments', value: stats.completedAppointments, trend: '15.6%', isUp: true, icon: CheckCircle2, cardBg: 'linear-gradient(135deg, #E0F2FE 0%, #BAE6FD 100%)', border: '#BAE6FD', iconBg: '#06B6D4', valColor: '#075985', labelColor: '#0284C7' },
     { title: 'Cancelled Appointments', value: stats.cancelledAppointments, trend: '2.1%', isUp: false, icon: XCircle, cardBg: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)', border: '#FECACA', iconBg: '#EF4444', valColor: '#991B1B', labelColor: '#DC2626' },
     { title: 'Total Revenue', value: stats.totalRevenue, trend: '18.6%', isUp: true, icon: DollarSign, cardBg: 'linear-gradient(135deg, #FEF9C3 0%, #FEF08A 100%)', border: '#FEF08A', iconBg: '#D97706', valColor: '#854D0E', labelColor: '#B45309' },
+    { title: "Today's Available Slots", value: stats.todayAvailableSlots || '186', trend: '4.2%', isUp: true, icon: Clock, cardBg: 'linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 100%)', border: '#DDD6FE', iconBg: '#8B5CF6', valColor: '#4C1D95', labelColor: '#7C3AED' },
+    { title: "Today's Waiting Patients", value: stats.todayWaitingPatients || '0', trend: '2.1%', isUp: false, icon: Users, cardBg: 'linear-gradient(135deg, #FFF1F2 0%, #FFE4E6 100%)', border: '#FECDD3', iconBg: '#F43F5E', valColor: '#9F1239', labelColor: '#E11D48' },
+    { title: "Today's Revenue", value: stats.todayRevenue || '₹0', trend: '12.4%', isUp: true, icon: DollarSign, cardBg: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', border: '#A7F3D0', iconBg: '#10B981', valColor: '#065F46', labelColor: '#059669' },
+    { title: 'No-show Rate', value: stats.noShowRate || '0.0%', trend: '0.0%', isUp: false, icon: ShieldAlert, cardBg: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)', border: '#FDE68A', iconBg: '#F59E0B', valColor: '#92400E', labelColor: '#D97706' },
   ];
 
   const screenshotPatients = [
@@ -91,6 +143,14 @@ const DoctorDashboard = () => {
     { id: 5, patient: 'Arjun Singh', doctor: 'Dr. Vivek Malhotra', dept: 'Neurologist', time: '21 Aug 04:30 PM', status: 'Cancelled', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&auto=format&fit=crop&q=80' },
   ];
 
+  const defaultAvatars = [
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&auto=format&fit=crop&q=80'
+  ];
+
   const recentList = appointments.length > 0 ? appointments.slice(0, 5).map((app, idx) => ({
     id: app._id,
     patient: app.user?.name || 'Patient',
@@ -98,7 +158,7 @@ const DoctorDashboard = () => {
     dept: app.specialization || 'General',
     time: `${app.date || 'Today'} ${app.timeSlot || ''}`,
     status: app.status === 'confirmed' ? 'Confirmed' : app.status === 'cancelled' ? 'Cancelled' : 'Pending',
-    avatar: `https://images.unsplash.com/photo-${1500000000000 + idx}?w=100&auto=format&fit=crop&q=80`
+    avatar: app.user?.avatar || defaultAvatars[idx % defaultAvatars.length]
   })) : screenshotPatients;
 
   const totalVal = Number(stats.totalAppointments) || appointments.length || 0;
@@ -289,8 +349,70 @@ const DoctorDashboard = () => {
                         {row.status}
                       </span>
                     </td>
-                    <td style={{ padding: '0.45rem 0.6rem' }}>
-                      <MoreVertical size={14} color="#94A3B8" style={{ cursor: 'pointer' }} />
+                    <td style={{ padding: '0.45rem 0.6rem', textAlign: 'center' }}>
+                      <div className="action-dropdown-container">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMenuId(activeMenuId === row.id ? null : row.id);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '0.25rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            borderRadius: '4px',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F1F5F9'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          title="Actions"
+                        >
+                          <MoreVertical size={16} color="#94A3B8" />
+                        </button>
+                        
+                        {activeMenuId === row.id && (
+                          <div className="action-dropdown-menu">
+                            {row.status !== 'Confirmed' && row.status !== 'Completed' && (
+                              <button 
+                                className="action-dropdown-item" 
+                                onClick={() => handleUpdateStatus(row.id, 'confirmed')}
+                              >
+                                <span style={{ width: '8px', height: '8px', backgroundColor: '#10B981', borderRadius: '50%' }} />
+                                Confirm
+                              </button>
+                            )}
+                            {row.status !== 'Completed' && (
+                              <button 
+                                className="action-dropdown-item" 
+                                onClick={() => handleUpdateStatus(row.id, 'completed')}
+                              >
+                                <span style={{ width: '8px', height: '8px', backgroundColor: '#0066FF', borderRadius: '50%' }} />
+                                Complete
+                              </button>
+                            )}
+                            {row.status !== 'Cancelled' && (
+                              <button 
+                                className="action-dropdown-item" 
+                                onClick={() => handleUpdateStatus(row.id, 'cancelled')}
+                              >
+                                <span style={{ width: '8px', height: '8px', backgroundColor: '#F43F5E', borderRadius: '50%' }} />
+                                Cancel
+                              </button>
+                            )}
+                            <button 
+                              className="action-dropdown-item danger" 
+                              onClick={() => handleDeleteAppointment(row.id)}
+                              style={{ borderTop: '1px solid #F1F5F9', marginTop: '0.2rem', paddingTop: '0.4rem' }}
+                            >
+                              <XCircle size={14} color="#DC2626" />
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

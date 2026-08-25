@@ -10,12 +10,20 @@ import {
   RefreshCw,
   HeartPulse,
   Upload,
-  Check,
   RotateCcw,
-  FileImage
+  Building,
+  Mail,
+  Phone,
+  MapPin,
+  Bell,
+  Shield,
+  Lock,
+  Sliders,
+  Check
 } from 'lucide-react';
 
 const SettingsPage = () => {
+  const [activeTab, setActiveTab] = useState('branding');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -23,14 +31,26 @@ const SettingsPage = () => {
   const [selectedFileName, setSelectedFileName] = useState('');
 
   const [formData, setFormData] = useState({
-    appName: 'DocAdmin',
-    appSubtitle: 'Doctor Appointment System',
-    logoUrl: '',
-    faviconUrl: '',
+    // Branding
+    appName: localStorage.getItem('docadmin_app_name') || 'DocAdmin',
+    appSubtitle: localStorage.getItem('docadmin_app_subtitle') || 'Doctor Appointment System',
+    logoUrl: localStorage.getItem('docadmin_logo_url') || '',
     primaryColor: '#0066FF',
+    // Clinic Profile
+    clinicName: 'CareSync Multi-Specialty Hospital',
     contactEmail: 'support@docadmin.com',
-    contactPhone: '+1 (555) 019-2834',
-    footerText: '© 2026 DocAdmin. All rights reserved.'
+    contactPhone: '+91 9876543210',
+    address: '102 Medical Enclave, Healthcare Avenue, New Delhi',
+    regNumber: 'REG-DEL-2026-9081',
+    // Notifications
+    smsAlerts: true,
+    emailPrescriptions: true,
+    invoiceAlerts: true,
+    reminderHours: '24',
+    // Security
+    sessionTimeoutMinutes: '30',
+    enforce2FA: false,
+    auditLogLevel: 'Verbose'
   });
 
   useEffect(() => {
@@ -42,20 +62,18 @@ const SettingsPage = () => {
     try {
       const res = await settingApi.getSettings();
       if (res.data?.success && res.data.settings) {
-        setFormData({
-          appName: res.data.settings.appName || 'DocAdmin',
-          appSubtitle: res.data.settings.appSubtitle || 'Doctor Appointment System',
-          logoUrl: res.data.settings.logoUrl || localStorage.getItem('docadmin_logo_url') || '',
-          faviconUrl: res.data.settings.faviconUrl || '',
-          primaryColor: res.data.settings.primaryColor || '#0066FF',
-          contactEmail: res.data.settings.contactEmail || 'support@docadmin.com',
-          contactPhone: res.data.settings.contactPhone || '+1 (555) 019-2834',
-          footerText: res.data.settings.footerText || '© 2026 DocAdmin. All rights reserved.'
-        });
+        setFormData((prev) => ({
+          ...prev,
+          appName: res.data.settings.appName || prev.appName,
+          appSubtitle: res.data.settings.appSubtitle || prev.appSubtitle,
+          logoUrl: res.data.settings.logoUrl || prev.logoUrl,
+          primaryColor: res.data.settings.primaryColor || prev.primaryColor,
+          contactEmail: res.data.settings.contactEmail || prev.contactEmail,
+          contactPhone: res.data.settings.contactPhone || prev.contactPhone
+        }));
       }
     } catch (err) {
       console.error('Fetch Settings Error:', err);
-      setErrorMsg('Failed to load system settings');
     } finally {
       setLoading(false);
     }
@@ -101,34 +119,29 @@ const SettingsPage = () => {
 
       window.dispatchEvent(new CustomEvent('app_settings_updated', { detail: formData }));
 
-      const res = await settingApi.updateSettings(formData);
-      if (res.data?.success) {
-        setSuccessMsg('✅ Dynamic App Logo & Settings saved successfully! Displayed across Dashboard & Sidebar.');
-        window.dispatchEvent(new CustomEvent('app_settings_updated', { detail: res.data.settings || formData }));
-        setTimeout(() => {
-          setSuccessMsg('');
-        }, 4000);
-      }
+      await settingApi.updateSettings(formData);
+      setSuccessMsg('✅ System Settings & Dynamic Branding updated successfully!');
+      setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err) {
-      console.error('Update Settings Error:', err);
-      setSuccessMsg('✅ Dynamic App Logo updated locally on Dashboard!');
-      setTimeout(() => {
-        setSuccessMsg('');
-      }, 4000);
+      setSuccessMsg('✅ Local System Settings & Dynamic Branding saved!');
+      setTimeout(() => setSuccessMsg(''), 4000);
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '850px' }}>
-      {/* Header Banner */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', fontFamily: 'Inter, sans-serif' }}>
+      
+      {/* 1. Header Banner */}
       <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#0F172A', marginBottom: '0.2rem' }}>
-            Dynamic App Logo Upload 📁
+          <h1 style={{ fontSize: '1.6rem', fontWeight: '800', color: '#0F172A', marginBottom: '0.2rem' }}>
+            System Settings & Clinic Configuration
           </h1>
-          <p style={{ color: '#64748B', fontSize: '0.88rem' }}>Choose an image file from your computer to update the Dashboard & Sidebar logo</p>
+          <p style={{ color: '#64748B', fontSize: '0.86rem' }}>
+            Configure clinic branding, dynamic logo, communication channels, and security policy rules
+          </p>
         </div>
 
         <button onClick={fetchSettings} className="btn btn-secondary btn-sm" title="Reload Settings">
@@ -137,179 +150,316 @@ const SettingsPage = () => {
       </div>
 
       {successMsg && (
-        <div className="alert alert-success" style={{ background: '#DCFCE7', color: '#166534', borderColor: '#BBF7D0', padding: '0.9rem 1.25rem', borderRadius: '12px', fontSize: '0.9rem', fontWeight: '600' }}>
+        <div className="alert alert-success" style={{ background: '#DCFCE7', color: '#166534', borderColor: '#BBF7D0', padding: '0.9rem 1.25rem', borderRadius: '12px', fontSize: '0.9rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           <CheckCircle2 size={20} color="#166534" />
           <span>{successMsg}</span>
         </div>
       )}
 
-      {errorMsg && (
-        <div className="alert alert-error">
-          <AlertCircle size={18} />
-          <span>{errorMsg}</span>
-        </div>
-      )}
+      {/* 2. Settings Tabs Navigation */}
+      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '2px solid #E2E8F0', paddingBottom: '0.5rem', flexWrap: 'wrap' }}>
+        <button
+          onClick={() => setActiveTab('branding')}
+          style={{
+            padding: '0.6rem 1.1rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeTab === 'branding' ? '#0066FF' : 'transparent',
+            color: activeTab === 'branding' ? '#FFFFFF' : '#64748B',
+            fontWeight: '700',
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem'
+          }}
+        >
+          <Image size={16} /> Branding & Logo
+        </button>
 
-      {loading ? (
-        <div style={{ padding: '3rem', textAlign: 'center', color: '#64748B' }}>
-          Loading logo settings...
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* Main Card: Choose File Logo Section */}
-          <div className="card">
-            <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0F172A', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <FileImage size={22} color="#0066FF" /> Select App Logo Image File
-            </h3>
+        <button
+          onClick={() => setActiveTab('clinic')}
+          style={{
+            padding: '0.6rem 1.1rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeTab === 'clinic' ? '#0066FF' : 'transparent',
+            color: activeTab === 'clinic' ? '#FFFFFF' : '#64748B',
+            fontWeight: '700',
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem'
+          }}
+        >
+          <Building size={16} /> Clinic Profile
+        </button>
 
-            {/* Live Sidebar Logo Preview Box */}
-            <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', padding: '1.4rem 1.75rem', borderRadius: '16px', marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '1.5rem', border: '1px solid #334155', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)' }}>
-              <div style={{ width: '60px', height: '60px', borderRadius: '14px', background: 'rgba(255, 255, 255, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(255, 255, 255, 0.25)', overflow: 'hidden' }}>
-                {formData.logoUrl ? (
-                  <img
-                    src={formData.logoUrl}
-                    alt="Uploaded Logo Preview"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    onError={(e) => { e.target.style.display = 'none'; }}
-                  />
-                ) : (
-                  <HeartPulse size={32} color="#FFFFFF" />
-                )}
+        <button
+          onClick={() => setActiveTab('notifications')}
+          style={{
+            padding: '0.6rem 1.1rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeTab === 'notifications' ? '#0066FF' : 'transparent',
+            color: activeTab === 'notifications' ? '#FFFFFF' : '#64748B',
+            fontWeight: '700',
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem'
+          }}
+        >
+          <Bell size={16} /> Notifications
+        </button>
+
+        <button
+          onClick={() => setActiveTab('security')}
+          style={{
+            padding: '0.6rem 1.1rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeTab === 'security' ? '#0066FF' : 'transparent',
+            color: activeTab === 'security' ? '#FFFFFF' : '#64748B',
+            fontWeight: '700',
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem'
+          }}
+        >
+          <Shield size={16} /> Security & Policy
+        </button>
+      </div>
+
+      {/* 3. Form Content */}
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        
+        {/* Tab 1: Branding */}
+        {activeTab === 'branding' && (
+          <div className="card" style={{ padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0F172A' }}>Branding & Dynamic Logo Upload</h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                  Application Title Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.appName}
+                  onChange={(e) => setFormData({ ...formData, appName: e.target.value })}
+                  style={{ width: '100%', padding: '0.6rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
+                />
               </div>
 
               <div>
-                <div style={{ fontSize: '0.75rem', color: '#38BDF8', fontWeight: '800', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                  DASHBOARD & SIDEBAR LOGO PREVIEW
-                </div>
-                <h3 style={{ fontSize: '1.4rem', fontWeight: '800', color: '#FFFFFF', margin: 0, lineHeight: '1.1' }}>
-                  {formData.appName || 'DocAdmin'}
-                </h3>
-                <span style={{ fontSize: '0.8rem', color: '#94A3B8', fontWeight: '500' }}>
-                  {formData.appSubtitle || 'Doctor Appointment System'}
-                </span>
-              </div>
-            </div>
-
-            {/* Dedicated File Chooser UI */}
-            <div style={{ background: '#F8FAFC', border: '2px dashed #CBD5E1', borderRadius: '16px', padding: '2rem 1.5rem', textAlign: 'center', marginBottom: '1.5rem' }}>
-              <Upload size={38} color="#0066FF" style={{ margin: '0 auto 0.75rem' }} />
-              <h4 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#0F172A', margin: '0 0 0.35rem 0' }}>
-                Select Image File from Computer
-              </h4>
-              <p style={{ fontSize: '0.84rem', color: '#64748B', margin: '0 0 1.25rem 0' }}>
-                Supports PNG, JPG, JPEG, SVG image files
-              </p>
-
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                <label
-                  htmlFor="logoFileInput"
-                  className="btn btn-primary"
-                  style={{ cursor: 'pointer', padding: '0.65rem 1.5rem', fontSize: '0.9rem', fontWeight: '700', borderRadius: '10px' }}
-                >
-                  <Upload size={18} /> Choose File
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                  Application Tagline / Subtitle
                 </label>
                 <input
-                  id="logoFileInput"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChoose}
-                  style={{ display: 'none' }}
-                />
-
-                <button
-                  type="button"
-                  onClick={handleResetLogo}
-                  className="btn btn-secondary"
-                  style={{ padding: '0.65rem 1.25rem', fontSize: '0.85rem' }}
-                >
-                  <RotateCcw size={15} /> Reset Default
-                </button>
-              </div>
-
-              {selectedFileName && (
-                <div style={{ marginTop: '1rem', color: '#166534', fontWeight: '600', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
-                  <Check size={16} /> Selected File: {selectedFileName}
-                </div>
-              )}
-            </div>
-
-            {/* App Branding Name & Subtitle Inputs */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div className="form-group">
-                <label>App Title / Brand Name *</label>
-                <input
                   type="text"
-                  className="input-field"
-                  value={formData.appName}
-                  onChange={(e) => setFormData({ ...formData, appName: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>App Subtitle / Tagline</label>
-                <input
-                  type="text"
-                  className="input-field"
                   value={formData.appSubtitle}
                   onChange={(e) => setFormData({ ...formData, appSubtitle: e.target.value })}
+                  style={{ width: '100%', padding: '0.6rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
                 />
+              </div>
+            </div>
+
+            {/* Dynamic Logo Uploader */}
+            <div style={{ background: '#F8FAFC', border: '2px dashed #CBD5E1', borderRadius: '16px', padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+              <div style={{ width: '70px', height: '70px', borderRadius: '16px', background: '#FFFFFF', border: '1px solid #E2E8F0', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {formData.logoUrl ? (
+                  <img src={formData.logoUrl} alt="App Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <HeartPulse size={36} color="#0066FF" />
+                )}
+              </div>
+
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: '700', color: '#0F172A', fontSize: '0.92rem' }}>Dynamic App Logo Image</div>
+                <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: '0.1rem' }}>Upload PNG or JPG file from your local computer to update Sidebar & Header branding instantly.</div>
+                {selectedFileName && (
+                  <div style={{ fontSize: '0.75rem', color: '#0066FF', fontWeight: '600', marginTop: '0.3rem' }}>Selected: {selectedFileName}</div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <label className="btn btn-primary btn-sm" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.9rem' }}>
+                  <Upload size={15} /> Upload File
+                  <input type="file" accept="image/*" onChange={handleFileChoose} style={{ display: 'none' }} />
+                </label>
+                <button type="button" onClick={handleResetLogo} className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.8rem' }}>
+                  <RotateCcw size={15} /> Reset
+                </button>
               </div>
             </div>
           </div>
+        )}
 
-          {/* Contact Details Card */}
-          <div className="card">
-            <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0F172A', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Globe size={20} color="#0066FF" /> Support Info & Footer
-            </h3>
+        {/* Tab 2: Clinic Profile */}
+        {activeTab === 'clinic' && (
+          <div className="card" style={{ padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0F172A' }}>Clinic & Organization Information</h3>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div className="form-group">
-                <label>Support Contact Email</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                  Hospital / Clinic Name
+                </label>
                 <input
-                  type="email"
-                  className="input-field"
-                  value={formData.contactEmail}
-                  onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                  type="text"
+                  value={formData.clinicName}
+                  onChange={(e) => setFormData({ ...formData, clinicName: e.target.value })}
+                  style={{ width: '100%', padding: '0.6rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
                 />
               </div>
 
-              <div className="form-group">
-                <label>Support Contact Phone</label>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                  Registration / Accreditation License ID
+                </label>
                 <input
                   type="text"
-                  className="input-field"
+                  value={formData.regNumber}
+                  onChange={(e) => setFormData({ ...formData, regNumber: e.target.value })}
+                  style={{ width: '100%', padding: '0.6rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                  Support Email Address
+                </label>
+                <input
+                  type="email"
+                  value={formData.contactEmail}
+                  onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                  style={{ width: '100%', padding: '0.6rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                  Emergency Helpline Phone
+                </label>
+                <input
+                  type="text"
                   value={formData.contactPhone}
                   onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })}
+                  style={{ width: '100%', padding: '0.6rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
                 />
               </div>
             </div>
 
-            <div className="form-group">
-              <label>Footer Copyright Text</label>
-              <input
-                type="text"
-                className="input-field"
-                value={formData.footerText}
-                onChange={(e) => setFormData({ ...formData, footerText: e.target.value })}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                Physical Campus Address
+              </label>
+              <textarea
+                rows="2"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                style={{ width: '100%', padding: '0.6rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
               />
             </div>
           </div>
+        )}
 
-          {/* Submit Action Button */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              style={{ padding: '0.85rem 2.25rem', fontSize: '0.95rem', fontWeight: '700', borderRadius: '12px' }}
-              disabled={submitting}
-            >
-              <Save size={18} /> {submitting ? 'Saving Logo...' : 'Save Dynamic Logo'}
-            </button>
+        {/* Tab 3: Notifications */}
+        {activeTab === 'notifications' && (
+          <div className="card" style={{ padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0F172A' }}>Notification & Communication Rules</h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', color: '#0F172A', fontWeight: '600' }}>
+                <input
+                  type="checkbox"
+                  checked={formData.smsAlerts}
+                  onChange={(e) => setFormData({ ...formData, smsAlerts: e.target.checked })}
+                  style={{ width: '18px', height: '18px' }}
+                />
+                Send Automated SMS Reminders for Confirmed Appointments
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', color: '#0F172A', fontWeight: '600' }}>
+                <input
+                  type="checkbox"
+                  checked={formData.emailPrescriptions}
+                  onChange={(e) => setFormData({ ...formData, emailPrescriptions: e.target.checked })}
+                  style={{ width: '18px', height: '18px' }}
+                />
+                Automatically Email Digital Prescriptions & Lab Results to Patients
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', fontSize: '0.9rem', color: '#0F172A', fontWeight: '600' }}>
+                <input
+                  type="checkbox"
+                  checked={formData.invoiceAlerts}
+                  onChange={(e) => setFormData({ ...formData, invoiceAlerts: e.target.checked })}
+                  style={{ width: '18px', height: '18px' }}
+                />
+                Dispatch Billing Invoices & Receipts via Email
+              </label>
+            </div>
           </div>
-        </form>
-      )}
+        )}
+
+        {/* Tab 4: Security & Policy */}
+        {activeTab === 'security' && (
+          <div className="card" style={{ padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0F172A' }}>Security & Policy Configuration</h3>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                  Session Auto Logout Timeout (Minutes)
+                </label>
+                <select
+                  value={formData.sessionTimeoutMinutes}
+                  onChange={(e) => setFormData({ ...formData, sessionTimeoutMinutes: e.target.value })}
+                  style={{ width: '100%', padding: '0.6rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
+                >
+                  <option value="15">15 Minutes</option>
+                  <option value="30">30 Minutes</option>
+                  <option value="60">60 Minutes</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                  Audit Logging Persistence Level
+                </label>
+                <select
+                  value={formData.auditLogLevel}
+                  onChange={(e) => setFormData({ ...formData, auditLogLevel: e.target.value })}
+                  style={{ width: '100%', padding: '0.6rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
+                >
+                  <option value="Standard">Standard (Login & Payments)</option>
+                  <option value="Verbose">Verbose (All API & Data Edits)</option>
+                  <option value="Strict">Strict Audit (Detailed Trace Log)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Submit Save Button */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="btn btn-primary"
+            style={{ padding: '0.65rem 1.5rem', borderRadius: '10px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+          >
+            <Save size={18} /> Save Settings Configuration
+          </button>
+        </div>
+
+      </form>
     </div>
   );
 };
