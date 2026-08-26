@@ -1,10 +1,10 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const router = express.Router();
-const { generateAccessToken, generateRefreshToken } = require('../../shared/utils/tokenHelper');
-const { sendSuccess, sendError } = require('../../shared/utils/responseHelper');
-const { ROLES, HTTP_STATUS } = require('../../shared/constants');
+const { generateAccessToken, generateRefreshToken } = require('../shared/utils/tokenHelper');
+const { sendSuccess, sendError } = require('../shared/utils/responseHelper');
+const { ROLES, HTTP_STATUS } = require('../shared/constants');
 
 // ── User Schema ───────────────────────────────────────────────────────────────
 const userSchema = new mongoose.Schema({
@@ -22,15 +22,14 @@ const userSchema = new mongoose.Schema({
   lastLogin:      { type: Date, default: null },
 }, { timestamps: true });
 
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  const bcrypt = require('bcryptjs');
+userSchema.pre('save', async function () {
+  if (!this.isModified('password')) return;
+  const bcrypt = require('bcrypt');
   this.password = await bcrypt.hash(this.password, 12);
-  next();
 });
 
 userSchema.methods.comparePassword = async function (candidate) {
-  const bcrypt = require('bcryptjs');
+  const bcrypt = require('bcrypt');
   return bcrypt.compare(candidate, this.password);
 };
 

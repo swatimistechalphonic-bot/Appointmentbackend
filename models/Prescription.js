@@ -111,4 +111,4 @@ const prescriptionSchema = new mongoose.Schema(
 prescriptionSchema.index({ patientName: 'text', diagnosis: 'text', prescriptionId: 'text' });
 prescriptionSchema.index({ date: 1, doctor: 1 });
 
-module.exports = mongoose.model('Prescription', prescriptionSchema);
+module.exports = mongoose.models.Prescription || mongoose.model('Prescription', prescriptionSchema);

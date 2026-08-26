@@ -150,4 +150,57 @@ export const paymentApi = {
   deletePayment: (id) => api.delete(`/payments/${id}`),
 };
 
+// Clinical Services Catalog API endpoints
+export const serviceApi = {
+  getStats: () => api.get('/services/stats'),
+  getAllServices: (params) => api.get('/services', { params }),
+  getServiceById: (id) => api.get(`/services/${id}`),
+  createService: (data) => api.post('/services', data),
+  updateService: (id, data) => api.put(`/services/${id}`, data),
+  deleteService: (id) => api.delete(`/services/${id}`),
+};
+
+// Laboratory & Diagnostics API endpoints
+export const labApi = {
+  getStats: () => api.get('/labs/stats'),
+  getAllLabTests: (params) => api.get('/labs', { params }),
+  getLabTestById: (id) => api.get(`/labs/${id}`),
+  createLabTest: (data) => api.post('/labs', data),
+  updateLabTest: (id, data) => api.put(`/labs/${id}`, data),
+  deleteLabTest: (id) => api.delete(`/labs/${id}`),
+};
+
+// Bed & Ward Management API endpoints
+export const bedApi = {
+  getStats: () => api.get('/beds/stats'),
+  getAllBeds: (params) => api.get('/beds', { params }),
+  getBedById: (id) => api.get(`/beds/${id}`),
+  createBed: (data) => api.post('/beds', data),
+  admitPatient: (id, data) => api.post(`/beds/${id}/admit`, data),
+  dischargePatient: (id) => api.post(`/beds/${id}/discharge`),
+  transferPatient: (id, data) => api.post(`/beds/${id}/transfer`, data),
+  updateBed: (id, data) => api.put(`/beds/${id}`, data),
+  deleteBed: (id) => api.delete(`/beds/${id}`),
+};
+
+// Discharge Summaries API endpoints
+export const dischargeSummaryApi = {
+  getStats: () => api.get('/discharge-summaries/stats'),
+  getAllSummaries: (params) => api.get('/discharge-summaries', { params }),
+  getSummaryById: (id) => api.get(`/discharge-summaries/${id}`),
+  createSummary: (data) => api.post('/discharge-summaries', data),
+  updateSummary: (id, data) => api.put(`/discharge-summaries/${id}`, data),
+  deleteSummary: (id) => api.delete(`/discharge-summaries/${id}`),
+};
+
+// Vaccinations API endpoints
+export const vaccinationApi = {
+  getStats: () => api.get('/vaccinations/stats'),
+  getAllVaccinations: (params) => api.get('/vaccinations', { params }),
+  getVaccinationById: (id) => api.get(`/vaccinations/${id}`),
+  createVaccination: (data) => api.post('/vaccinations', data),
+  updateVaccination: (id, data) => api.put(`/vaccinations/${id}`, data),
+  deleteVaccination: (id) => api.delete(`/vaccinations/${id}`),
+};
+
 export default api;

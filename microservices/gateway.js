@@ -12,6 +12,18 @@ const reviewService = require('./review-service');
 const chatService = require('./chat-service');
 const settingService = require('./setting-service');
 const paymentService = require('./payment-service');
+const organizationService = require('./organization-service');
+const scheduleService = require('./schedule-service');
+const medicalRecordService = require('./medical-record-service');
+const telemedicineService = require('./telemedicine-service');
+const billingService = require('./billing-service');
+const notificationService = require('./notification-service');
+const analyticsService = require('./analytics-service');
+const subscriptionService = require('./subscription-service');
+const auditService = require('./audit-service');
+const serviceService = require('./service-service');
+const labService = require('./lab-service');
+const bedService = require('./bed-service');
 
 const services = [
     authService,
@@ -24,7 +36,19 @@ const services = [
     reviewService,
     chatService,
     settingService,
-    paymentService
+    paymentService,
+    organizationService,
+    scheduleService,
+    medicalRecordService,
+    telemedicineService,
+    billingService,
+    notificationService,
+    analyticsService,
+    subscriptionService,
+    auditService,
+    serviceService,
+    labService,
+    bedService
 ];
 
 const registerMicroservices = (app) => {

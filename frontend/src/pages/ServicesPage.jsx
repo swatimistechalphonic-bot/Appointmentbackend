@@ -1,500 +1,308 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { serviceApi } from '../services/api';
 import {
-  Stethoscope,
-  Search,
-  Plus,
-  Edit,
-  Trash2,
-  X,
-  CheckCircle2,
-  AlertCircle,
-  Building2,
-  Clock,
-  DollarSign
+    Stethoscope, Search, Plus, X, Edit, Trash2,
+    CheckCircle2, XCircle, AlertCircle, IndianRupee,
+    Activity, Heart, Bone, Brain, Pill, Zap, Microscope, Smile
 } from 'lucide-react';
 
+const CATEGORIES = ['All', 'General', 'Cardiology', 'Orthopedics', 'Neurology', 'Gynecology', 'Radiology', 'Pathology', 'Dental', 'Emergency'];
+
+const CATEGORY_STYLES = {
+    General:     { color: '#0066FF', bg: '#EEF4FF' },
+    Cardiology:  { color: '#EF4444', bg: '#FEE2E2' },
+    Orthopedics: { color: '#F59E0B', bg: '#FEF3C7' },
+    Neurology:   { color: '#8B5CF6', bg: '#F3E8FF' },
+    Gynecology:  { color: '#EC4899', bg: '#FCE7F3' },
+    Radiology:   { color: '#06B6D4', bg: '#ECFEFF' },
+    Pathology:   { color: '#14B8A6', bg: '#F0FDFA' },
+    Dental:      { color: '#3B82F6', bg: '#EFF6FF' },
+    Emergency:   { color: '#F97316', bg: '#FFF7ED' },
+};
+
+const StatCard = ({ label, value, icon, bg, color }) => (
+    <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1.1rem', padding: '1.25rem 1.5rem' }}>
+        <div style={{ width: 52, height: 52, borderRadius: 14, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {icon}
+        </div>
+        <div>
+            <p style={{ color: '#64748B', fontSize: '0.82rem', fontWeight: 600, margin: 0 }}>{label}</p>
+            <p style={{ fontSize: '1.5rem', fontWeight: 800, color: color || '#0F172A', margin: 0 }}>{value}</p>
+        </div>
+    </div>
+);
+
 const ServicesPage = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [deptFilter, setDeptFilter] = useState('All');
-  
-  // Modals
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editService, setEditService] = useState(null);
+    const [services, setServices] = useState([]);
+    const [stats, setStats] = useState({ total: 0, active: 0, inactive: 0, totalRevenue: 0 });
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [search, setSearch] = useState('');
+    const [filterCategory, setFilterCategory] = useState('All');
+    const [filterStatus, setFilterStatus] = useState('All');
 
-  // Initial Services List
-  const [services, setServices] = useState([
-    {
-      id: 'SRV-001',
-      name: 'General Consultation',
-      duration: '30 Mins',
-      fee: 500,
-      department: 'General Medicine',
-      status: 'Active'
-    },
-    {
-      id: 'SRV-002',
-      name: 'Follow-up Consultation',
-      duration: '15 Mins',
-      fee: 300,
-      department: 'General Medicine',
-      status: 'Active'
-    },
-    {
-      id: 'SRV-003',
-      name: 'ECG / Electrocardiogram',
-      duration: '20 Mins',
-      fee: 800,
-      department: 'Cardiology',
-      status: 'Active'
-    },
-    {
-      id: 'SRV-004',
-      name: 'Orthopedic Joint Checkup',
-      duration: '30 Mins',
-      fee: 600,
-      department: 'Orthopedics',
-      status: 'Active'
-    },
-    {
-      id: 'SRV-005',
-      name: 'Gynecological Consultation',
-      duration: '30 Mins',
-      fee: 700,
-      department: 'Gynecology',
-      status: 'Active'
-    },
-    {
-      id: 'SRV-006',
-      name: 'Neurological Consultation',
-      duration: '45 Mins',
-      fee: 1200,
-      department: 'Neurology',
-      status: 'Active'
-    }
-  ]);
+    const [showModal, setShowModal] = useState(false);
+    const [editingService, setEditingService] = useState(null);
+    const [form, setForm] = useState({ name: '', category: 'General', price: '', duration: '', description: '', isActive: true });
+    const [formError, setFormError] = useState('');
+    const [saving, setSaving] = useState(false);
 
-  // Form states
-  const [addFormData, setAddFormData] = useState({
-    name: '',
-    duration: '30 Mins',
-    fee: '',
-    department: 'General Medicine',
-    status: 'Active'
-  });
-  const [editFormData, setEditFormData] = useState({});
+    const fetchAll = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError('');
+            const [statsRes, servicesRes] = await Promise.all([
+                serviceApi.getStats(),
+                serviceApi.getAllServices({
+                    search: search || undefined,
+                    category: filterCategory !== 'All' ? filterCategory : undefined,
+                    status: filterStatus !== 'All' ? filterStatus : undefined,
+                })
+            ]);
+            setStats(statsRes.data.data || {});
+            setServices(servicesRes.data.data || []);
+        } catch {
+            setError('Failed to load services. Please check the server connection.');
+        } finally {
+            setLoading(false);
+        }
+    }, [search, filterCategory, filterStatus]);
 
-  // Filtered Services list
-  const filteredServices = services.filter((s) => {
-    const matchesSearch =
-      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDept = deptFilter === 'All' || s.department === deptFilter;
-    return matchesSearch && matchesDept;
-  });
+    useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  // Unique departments for filter
-  const departmentsList = ['All', 'General Medicine', 'Cardiology', 'Orthopedics', 'Gynecology', 'Neurology'];
-
-  // Metrics
-  const totalCount = services.length;
-  const activeCount = services.filter(s => s.status === 'Active').length;
-  const avgFeeVal = Math.round(services.reduce((sum, s) => sum + s.fee, 0) / totalCount) || 0;
-  const premiumCount = services.filter(s => s.fee >= 800).length;
-
-  // Handlers
-  const handleAddSubmit = (e) => {
-    e.preventDefault();
-    if (!addFormData.name || !addFormData.fee) return;
-
-    const newService = {
-      id: 'SRV-' + String(Date.now()).slice(-3),
-      name: addFormData.name,
-      duration: addFormData.duration,
-      fee: parseFloat(addFormData.fee),
-      department: addFormData.department,
-      status: addFormData.status
+    const openAdd = () => {
+        setEditingService(null);
+        setForm({ name: '', category: 'General', price: '', duration: '', description: '', isActive: true });
+        setFormError('');
+        setShowModal(true);
     };
 
-    setServices([newService, ...services]);
-    setIsAddModalOpen(false);
-    setAddFormData({
-      name: '',
-      duration: '30 Mins',
-      fee: '',
-      department: 'General Medicine',
-      status: 'Active'
-    });
-  };
+    const openEdit = (svc) => {
+        setEditingService(svc);
+        setForm({ name: svc.name, category: svc.category || 'General', price: svc.price, duration: svc.duration || '', description: svc.description || '', isActive: svc.isActive });
+        setFormError('');
+        setShowModal(true);
+    };
 
-  const handleOpenEditModal = (srv) => {
-    setEditService(srv);
-    setEditFormData({ ...srv });
-  };
+    const handleSave = async (e) => {
+        e.preventDefault();
+        setFormError('');
+        if (!form.name || form.price === '') { setFormError('Service name and price are required.'); return; }
+        setSaving(true);
+        try {
+            if (editingService) {
+                await serviceApi.updateService(editingService._id, form);
+            } else {
+                await serviceApi.createService(form);
+            }
+            setShowModal(false);
+            fetchAll();
+        } catch (err) {
+            setFormError(err?.response?.data?.message || 'Save failed. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
 
-  const handleEditSubmit = (e) => {
-    e.preventDefault();
-    setServices((prev) =>
-      prev.map((s) => (s.id === editService.id ? { ...editFormData, fee: parseFloat(editFormData.fee) } : s))
+    const handleDelete = async (id, name) => {
+        if (!window.confirm(`Delete service "${name}"?`)) return;
+        try { await serviceApi.deleteService(id); fetchAll(); }
+        catch (err) { alert(err?.response?.data?.message || 'Delete failed.'); }
+    };
+
+    const avgPrice = stats.total ? Math.round((stats.totalRevenue || 0) / stats.total) : 0;
+
+    return (
+        <div className="page-content">
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <Stethoscope size={26} color="#0066FF" /> Clinical Services
+                    </h1>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', margin: '4px 0 0' }}>
+                        Manage your hospital's service catalog, pricing &amp; availability
+                    </p>
+                </div>
+                <button className="btn btn-primary" onClick={openAdd} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Plus size={16} /> Add Service
+                </button>
+            </div>
+
+            {/* Stats */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                <StatCard label="Total Services" value={stats.total || 0} icon={<Stethoscope size={24} color="#0066FF" />} bg="#EEF4FF" color="#0066FF" />
+                <StatCard label="Active Services" value={stats.active || 0} icon={<CheckCircle2 size={24} color="#10B981" />} bg="#D1FAE5" color="#10B981" />
+                <StatCard label="Inactive" value={stats.inactive || 0} icon={<XCircle size={24} color="#F59E0B" />} bg="#FEF3C7" color="#F59E0B" />
+                <StatCard label="Avg Price" value={`₹${avgPrice}`} icon={<IndianRupee size={24} color="#8B5CF6" />} bg="#F3E8FF" color="#8B5CF6" />
+            </div>
+
+            {/* Filters */}
+            <div className="card" style={{ padding: '0.9rem 1.2rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ flex: 1, minWidth: 200, display: 'flex', alignItems: 'center', gap: 8, background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 10, padding: '0 12px' }}>
+                    <Search size={16} color="#94A3B8" />
+                    <input
+                        type="text" placeholder="Search services..."
+                        value={search} onChange={e => setSearch(e.target.value)}
+                        style={{ border: 'none', background: 'transparent', outline: 'none', padding: '0.6rem 0', fontSize: '0.9rem', color: 'var(--text-main)', width: '100%', fontFamily: 'var(--font-primary)' }}
+                    />
+                </div>
+                <select className="input-field" value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={{ width: 'auto' }}>
+                    {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                </select>
+                <select className="input-field" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ width: 'auto' }}>
+                    {['All', 'Active', 'Inactive'].map(s => <option key={s}>{s}</option>)}
+                </select>
+            </div>
+
+            {/* Error */}
+            {error && (
+                <div className="alert alert-error" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <AlertCircle size={16} /> {error}
+                </div>
+            )}
+
+            {/* Table */}
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                {loading ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 220, gap: 12, color: 'var(--text-muted)' }}>
+                        <div className="loading-spinner" />
+                        <span>Loading services...</span>
+                    </div>
+                ) : (
+                    <table className="doc-table">
+                        <thead>
+                            <tr>
+                                <th>Service Name</th>
+                                <th>Category</th>
+                                <th>Price</th>
+                                <th>Duration</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {services.length === 0 ? (
+                                <tr>
+                                    <td colSpan={6} style={{ textAlign: 'center', padding: '3.5rem', color: 'var(--text-muted)' }}>
+                                        <Stethoscope size={40} color="#E2E8F0" style={{ display: 'block', margin: '0 auto 12px' }} />
+                                        No services found. Click "Add Service" to get started.
+                                    </td>
+                                </tr>
+                            ) : services.map(svc => {
+                                const cat = CATEGORY_STYLES[svc.category] || { color: '#64748B', bg: '#F1F5F9' };
+                                return (
+                                    <tr key={svc._id}>
+                                        <td>
+                                            <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{svc.name}</div>
+                                            {svc.description && <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: 2 }}>{svc.description}</div>}
+                                        </td>
+                                        <td>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 12px', borderRadius: 99, fontSize: '0.78rem', fontWeight: 700, background: cat.bg, color: cat.color }}>
+                                                {svc.category || 'General'}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span style={{ fontWeight: 800, color: '#10B981', fontSize: '0.95rem' }}>₹{svc.price}</span>
+                                        </td>
+                                        <td style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                                            {svc.duration ? `${svc.duration} min` : '—'}
+                                        </td>
+                                        <td>
+                                            {svc.isActive
+                                                ? <span className="doc-badge confirmed" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={12} /> Active</span>
+                                                : <span className="doc-badge cancelled" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><XCircle size={12} /> Inactive</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: 6 }}>
+                                                <button
+                                                    className="btn btn-secondary btn-sm"
+                                                    onClick={() => openEdit(svc)}
+                                                    style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                >
+                                                    <Edit size={13} /> Edit
+                                                </button>
+                                                <button
+                                                    className="btn btn-sm"
+                                                    style={{ background: '#FEE2E2', color: '#DC2626', border: '1px solid #FECACA', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                    onClick={() => handleDelete(svc._id, svc.name)}
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+
+            {/* Add / Edit Modal */}
+            {showModal && (
+                <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
+                    <div className="modal-content">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                {editingService ? <><Edit size={18} color="#0066FF" /> Edit Service</> : <><Plus size={18} color="#0066FF" /> Add New Service</>}
+                            </h2>
+                            <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}>
+                                <X size={22} />
+                            </button>
+                        </div>
+
+                        {formError && (
+                            <div className="alert alert-error" style={{ marginBottom: '1rem', display: 'flex', gap: 8 }}>
+                                <AlertCircle size={15} /> {formError}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSave}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                    <label>Service Name *</label>
+                                    <input className="input-field" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. ECG Test, X-Ray Chest" required />
+                                </div>
+                                <div className="form-group">
+                                    <label>Category</label>
+                                    <select className="input-field" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
+                                        {CATEGORIES.filter(c => c !== 'All').map(c => <option key={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>Price (₹) *</label>
+                                    <input className="input-field" type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} min="0" placeholder="500" required />
+                                </div>
+                                <div className="form-group">
+                                    <label>Duration (minutes)</label>
+                                    <input className="input-field" type="number" value={form.duration} onChange={e => setForm({ ...form, duration: e.target.value })} min="0" placeholder="30" />
+                                </div>
+                                <div className="form-group">
+                                    <label>Status</label>
+                                    <select className="input-field" value={form.isActive ? 'Active' : 'Inactive'} onChange={e => setForm({ ...form, isActive: e.target.value === 'Active' })}>
+                                        <option>Active</option>
+                                        <option>Inactive</option>
+                                    </select>
+                                </div>
+                                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                    <label>Description</label>
+                                    <textarea className="input-field" rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Brief description of the service..." style={{ resize: 'vertical' }} />
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+                                <button type="submit" className="btn btn-primary" disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                    {saving ? 'Saving...' : editingService ? <><Edit size={15} /> Update Service</> : <><Plus size={15} /> Create Service</>}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
     );
-    setEditService(null);
-  };
-
-  const handleDeleteService = (id, name) => {
-    if (!window.confirm(`Are you sure you want to delete service "${name}"?`)) return;
-    setServices((prev) => prev.filter((s) => s.id !== id));
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', fontFamily: 'Inter, sans-serif' }}>
-      
-      {/* 1. Header Banner */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: '800', color: '#0F172A', marginBottom: '0.2rem' }}>
-            Clinical Services Catalog
-          </h1>
-          <p style={{ color: '#64748B', fontSize: '0.86rem' }}>Configure clinic offerings, checkup packages, durations, department mapping, and consulting fees</p>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.65rem' }}>
-          <div className="header-search" style={{ width: '220px' }}>
-            <Search size={15} color="#64748B" />
-            <input
-              type="text"
-              placeholder="Search Service Name..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ fontSize: '0.82rem' }}
-            />
-          </div>
-
-          <select
-            className="filter-select"
-            value={deptFilter}
-            onChange={(e) => setDeptFilter(e.target.value)}
-            style={{ fontSize: '0.82rem', padding: '0.45rem 1.8rem 0.45rem 0.85rem' }}
-          >
-            {departmentsList.map(d => (
-              <option key={d} value={d}>{d === 'All' ? 'All Departments' : d}</option>
-            ))}
-          </select>
-
-          <button className="btn btn-primary btn-sm" onClick={() => setIsAddModalOpen(true)} style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem' }}>
-            <Plus size={16} /> Add Service
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Top Summary Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-        
-        {/* Card 1: Total Services */}
-        <div className="card" style={{ padding: '1.25rem', border: '1px solid #E2E8F0', borderRadius: '16px', background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#3B82F6', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Stethoscope size={22} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.78rem', color: '#1E3A8A', fontWeight: '700' }}>TOTAL SERVICES</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#1E3A8A', marginTop: '0.1rem' }}>{totalCount}</div>
-          </div>
-        </div>
-
-        {/* Card 2: Active */}
-        <div className="card" style={{ padding: '1.25rem', border: '1px solid #E2E8F0', borderRadius: '16px', background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#10B981', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <CheckCircle2 size={22} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.78rem', color: '#064E3B', fontWeight: '700' }}>ACTIVE</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#064E3B', marginTop: '0.1rem' }}>{activeCount}</div>
-          </div>
-        </div>
-
-        {/* Card 3: Avg Fee */}
-        <div className="card" style={{ padding: '1.25rem', border: '1px solid #E2E8F0', borderRadius: '16px', background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#F59E0B', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <DollarSign size={22} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.78rem', color: '#78350F', fontWeight: '700' }}>AVG SERVICE FEE</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#78350F', marginTop: '0.1rem' }}>₹{avgFeeVal}</div>
-          </div>
-        </div>
-
-        {/* Card 4: Premium Diagnostics */}
-        <div className="card" style={{ padding: '1.25rem', border: '1px solid #E2E8F0', borderRadius: '16px', background: 'linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 100%)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#8B5CF6', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Clock size={22} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.78rem', color: '#4C1D95', fontWeight: '700' }}>SPECIAL TESTS (&gt;₹800)</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#4C1D95', marginTop: '0.1rem' }}>{premiumCount}</div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* 3. Services Grid Table */}
-      <div className="card" style={{ padding: '1.25rem' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="doc-table">
-            <thead>
-              <tr>
-                <th style={{ padding: '0.75rem' }}>Service ID</th>
-                <th style={{ padding: '0.75rem' }}>Service Name</th>
-                <th style={{ padding: '0.75rem' }}>Mapped Department</th>
-                <th style={{ padding: '0.75rem' }}>Slot Duration</th>
-                <th style={{ padding: '0.75rem' }}>Consultation Fee</th>
-                <th style={{ padding: '0.75rem' }}>Status</th>
-                <th style={{ padding: '0.75rem', textAlign: 'center' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredServices.map((s) => (
-                <tr key={s.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '0.85rem', fontWeight: '800', color: '#0066FF' }}>{s.id}</td>
-                  <td style={{ padding: '0.85rem', fontWeight: '800', color: '#0F172A' }}>{s.name}</td>
-                  <td style={{ padding: '0.85rem', color: '#475569' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <Building2 size={14} color="#0066FF" />
-                      <span>{s.department}</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '0.85rem', color: '#475569', fontWeight: '700' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <Clock size={14} color="#10B981" />
-                      <span>{s.duration}</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '0.85rem', fontWeight: '850', color: '#0F172A' }}>₹{s.fee}</td>
-                  <td style={{ padding: '0.85rem' }}>
-                    <span className={`doc-badge ${s.status === 'Active' ? 'confirmed' : 'cancelled'}`}>
-                      {s.status}
-                    </span>
-                  </td>
-                  <td style={{ padding: '0.85rem', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        style={{ padding: '0.4rem 0.65rem', color: '#D97706', borderColor: '#FDE68A', background: '#FFFBEB' }}
-                        onClick={() => handleOpenEditModal(s)}
-                      >
-                        <Edit size={14} />
-                      </button>
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        style={{ padding: '0.4rem 0.65rem', color: '#DC2626', borderColor: '#FCA5A5', background: '#FEF2F2' }}
-                        onClick={() => handleDeleteService(s.id, s.name)}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* 4. Modals */}
-
-      {/* Modal A: Add Service */}
-      {isAddModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '500px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.85rem', borderBottom: '1px solid #E2E8F0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <Stethoscope size={22} color="#0066FF" />
-                <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0F172A', margin: 0 }}>Add New Service</h2>
-              </div>
-              <button onClick={() => setIsAddModalOpen(false)} className="btn btn-secondary btn-sm" style={{ padding: '0.35rem', borderRadius: '50%' }}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddSubmit}>
-              <div className="form-group">
-                <label>Service / Consultation Name *</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  placeholder="e.g. General Consultation, ECG checkup..."
-                  value={addFormData.name}
-                  onChange={(e) => setAddFormData({ ...addFormData, name: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="form-group">
-                  <label>Department</label>
-                  <select
-                    className="input-field"
-                    value={addFormData.department}
-                    onChange={(e) => setAddFormData({ ...addFormData, department: e.target.value })}
-                  >
-                    <option value="General Medicine">General Medicine</option>
-                    <option value="Cardiology">Cardiology</option>
-                    <option value="Orthopedics">Orthopedics</option>
-                    <option value="Gynecology">Gynecology</option>
-                    <option value="Neurology">Neurology</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Slot Duration</label>
-                  <select
-                    className="input-field"
-                    value={addFormData.duration}
-                    onChange={(e) => setAddFormData({ ...addFormData, duration: e.target.value })}
-                  >
-                    <option value="15 Mins">15 Mins</option>
-                    <option value="20 Mins">20 Mins</option>
-                    <option value="30 Mins">30 Mins</option>
-                    <option value="45 Mins">45 Mins</option>
-                    <option value="60 Mins">60 Mins</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="form-group">
-                  <label>Consultation Fee (₹) *</label>
-                  <input
-                    type="number"
-                    className="input-field"
-                    placeholder="e.g. 500"
-                    value={addFormData.fee}
-                    onChange={(e) => setAddFormData({ ...addFormData, fee: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Status</label>
-                  <select
-                    className="input-field"
-                    value={addFormData.status}
-                    onChange={(e) => setAddFormData({ ...addFormData, status: e.target.value })}
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
-                <button type="button" onClick={() => setIsAddModalOpen(false)} className="btn btn-secondary">
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Save Service
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal B: Edit Service */}
-      {editService && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '500px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.85rem', borderBottom: '1px solid #E2E8F0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <Stethoscope size={22} color="#0066FF" />
-                <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0F172A', margin: 0 }}>Modify Service Detail</h2>
-              </div>
-              <button onClick={() => setEditService(null)} className="btn btn-secondary btn-sm" style={{ padding: '0.35rem', borderRadius: '50%' }}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleEditSubmit}>
-              <div className="form-group">
-                <label>Service / Consultation Name *</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  value={editFormData.name}
-                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="form-group">
-                  <label>Department</label>
-                  <select
-                    className="input-field"
-                    value={editFormData.department}
-                    onChange={(e) => setEditFormData({ ...editFormData, department: e.target.value })}
-                  >
-                    <option value="General Medicine">General Medicine</option>
-                    <option value="Cardiology">Cardiology</option>
-                    <option value="Orthopedics">Orthopedics</option>
-                    <option value="Gynecology">Gynecology</option>
-                    <option value="Neurology">Neurology</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Slot Duration</label>
-                  <select
-                    className="input-field"
-                    value={editFormData.duration}
-                    onChange={(e) => setEditFormData({ ...editFormData, duration: e.target.value })}
-                  >
-                    <option value="15 Mins">15 Mins</option>
-                    <option value="20 Mins">20 Mins</option>
-                    <option value="30 Mins">30 Mins</option>
-                    <option value="45 Mins">45 Mins</option>
-                    <option value="60 Mins">60 Mins</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="form-group">
-                  <label>Consultation Fee (₹) *</label>
-                  <input
-                    type="number"
-                    className="input-field"
-                    value={editFormData.fee}
-                    onChange={(e) => setEditFormData({ ...editFormData, fee: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Status</label>
-                  <select
-                    className="input-field"
-                    value={editFormData.status}
-                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
-                <button type="button" onClick={() => setEditService(null)} className="btn btn-secondary">
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Update Service
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-    </div>
-  );
 };
 
 export default ServicesPage;

@@ -94,4 +94,4 @@ const queueSchema = new mongoose.Schema(
 queueSchema.index({ date: 1, status: 1 });
 queueSchema.index({ date: 1, doctor: 1 });
 
-module.exports = mongoose.model('Queue', queueSchema);
+module.exports = mongoose.models.Queue || mongoose.model('Queue', queueSchema);

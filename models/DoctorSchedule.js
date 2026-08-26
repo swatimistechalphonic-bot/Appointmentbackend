@@ -50,4 +50,4 @@ const doctorScheduleSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-module.exports = mongoose.model('DoctorSchedule', doctorScheduleSchema);
+module.exports = mongoose.models.DoctorSchedule || mongoose.model('DoctorSchedule', doctorScheduleSchema);

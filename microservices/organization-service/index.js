@@ -1,8 +1,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const router = express.Router();
-const { sendSuccess, sendError } = require('../../shared/utils/responseHelper');
-const { HTTP_STATUS } = require('../../shared/constants');
+const { sendSuccess, sendError } = require('../shared/utils/responseHelper');
+const { HTTP_STATUS } = require('../shared/constants');
 
 // ── Organization Schema ───────────────────────────────────────────────────────
 const organizationSchema = new mongoose.Schema({

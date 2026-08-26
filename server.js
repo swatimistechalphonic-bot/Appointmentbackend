@@ -8,7 +8,11 @@ const userRoutes = require('./routes/userRoutes');
 const appointmentRoutes = require('./routes/appointmentRoutes');
 const queueRoutes = require('./routes/queueRoutes');
 const prescriptionRoutes = require('./routes/prescriptionRoutes');
-const patientRoutes = require('./routes/patientRoutes');
+const serviceRoutes = require('./routes/serviceRoutes');
+const labRoutes = require('./routes/labRoutes');
+const bedRoutes = require('./routes/bedRoutes');
+const dischargeSummaryRoutes = require('./routes/dischargeSummaryRoutes');
+const vaccinationRoutes = require('./routes/vaccinationRoutes');
 const { registerMicroservices } = require('./microservices/gateway');
 
 const app = express();
@@ -75,7 +79,11 @@ app.use('/api/users', userRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/queue', queueRoutes);
 app.use('/api/prescriptions', prescriptionRoutes);
-app.use('/api/patients', patientRoutes);
+app.use('/api/services', serviceRoutes);
+app.use('/api/labs', labRoutes);
+app.use('/api/beds', bedRoutes);
+app.use('/api/discharge-summaries', dischargeSummaryRoutes);
+app.use('/api/vaccinations', vaccinationRoutes);
 
 // Default Route
 app.get('/', (req, res) => {

@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema(
         },
         role: {
             type: String,
-            enum: ['user', 'doctor', 'admin'],
+            enum: ['user', 'doctor', 'admin', 'super_admin', 'receptionist', 'patient'],
             default: 'user'
         },
         bio: {
@@ -57,5 +57,5 @@ const userSchema = new mongoose.Schema(
     }
 );
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = mongoose.models.User || mongoose.model('User', userSchema);
 

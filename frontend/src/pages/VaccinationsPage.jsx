@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { vaccinationApi } from '../services/api';
 import {
   Syringe,
   Search,
@@ -12,185 +13,143 @@ import {
   ShieldCheck
 } from 'lucide-react';
 
-const initialVaccinations = [
-  {
-    id: 'VAC-9001',
-    patientName: 'Aarav Gupta',
-    age: '6 Months',
-    vaccineName: 'OPV & DTP Booster 1',
-    doseNumber: 'Dose 2 of 3',
-    dueDate: '2026-08-20',
-    administeredDate: '2026-08-20',
-    administeredBy: 'Nurse Mary Joseph',
-    status: 'Completed'
-  },
-  {
-    id: 'VAC-9002',
-    patientName: 'Ananya Sharma',
-    age: '12 Months',
-    vaccineName: 'MMR (Measles, Mumps, Rubella)',
-    doseNumber: 'Dose 1 of 2',
-    dueDate: '2026-08-28',
-    administeredDate: null,
-    administeredBy: 'Pending Appointment',
-    status: 'Scheduled'
-  },
-  {
-    id: 'VAC-9003',
-    patientName: 'Rohan Mehta',
-    age: '5 Years',
-    vaccineName: 'Typhoid Conjugate Vaccine',
-    doseNumber: 'Booster Dose',
-    dueDate: '2026-08-15',
-    administeredDate: null,
-    administeredBy: 'Overdue Notice Sent',
-    status: 'Overdue'
-  },
-  {
-    id: 'VAC-9004',
-    patientName: 'Priya Verma',
-    age: '28 Years',
-    vaccineName: 'Hepatitis B Recombinant',
-    doseNumber: 'Dose 3 of 3',
-    dueDate: '2026-08-24',
-    administeredDate: '2026-08-24',
-    administeredBy: 'Nurse Mary Joseph',
-    status: 'Completed'
-  }
-];
-
 const VaccinationsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [vaccinations, setVaccinations] = useState(() => {
-    const saved = localStorage.getItem('caresync_vaccinations_list');
-    return saved ? JSON.parse(saved) : initialVaccinations;
-  });
+  const [vaccinations, setVaccinations] = useState([]);
+  const [stats, setStats] = useState({ total: 0, completed: 0, scheduled: 0, overdue: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newVac, setNewVac] = useState({
     patientName: '',
-    age: '',
+    age: '6 Months',
     vaccineName: 'MMR (Measles, Mumps, Rubella)',
     doseNumber: 'Dose 1',
     dueDate: '',
-    administeredBy: 'Nurse Mary Joseph'
+    administeredDate: '',
+    administeredBy: 'Nurse Mary Joseph',
+    status: 'Scheduled'
   });
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchAll = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const [statsRes, listRes] = await Promise.all([
+        vaccinationApi.getStats(),
+        vaccinationApi.getAllVaccinations({
+          search: searchTerm || undefined,
+          status: statusFilter !== 'All' ? statusFilter : undefined
+        })
+      ]);
+      setStats(statsRes.data.data || { total: 0, completed: 0, scheduled: 0, overdue: 0 });
+      setVaccinations(listRes.data.data || []);
+    } catch {
+      setError('Failed to fetch vaccination records. Please check your connection.');
+    } finally {
+      setLoading(false);
+    }
+  }, [searchTerm, statusFilter]);
 
   useEffect(() => {
-    localStorage.setItem('caresync_vaccinations_list', JSON.stringify(vaccinations));
-  }, [vaccinations]);
+    fetchAll();
+  }, [fetchAll]);
 
-  const filteredVaccinations = vaccinations.filter((v) => {
-    const matchesSearch =
-      v.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.vaccineName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'All' || v.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  // Metrics
-  const totalCount = vaccinations.length;
-  const completedCount = vaccinations.filter((v) => v.status === 'Completed').length;
-  const scheduledCount = vaccinations.filter((v) => v.status === 'Scheduled').length;
-  const overdueCount = vaccinations.filter((v) => v.status === 'Overdue').length;
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!newVac.patientName.trim()) return;
-
-    const created = {
-      id: 'VAC-' + Math.floor(9000 + Math.random() * 900),
-      patientName: newVac.patientName,
-      age: newVac.age || 'General',
-      vaccineName: newVac.vaccineName,
-      doseNumber: newVac.doseNumber,
-      dueDate: newVac.dueDate || new Date().toISOString().split('T')[0],
-      administeredDate: new Date().toISOString().split('T')[0],
-      administeredBy: newVac.administeredBy,
-      status: 'Completed'
-    };
-
-    setVaccinations([created, ...vaccinations]);
-    setIsModalOpen(false);
-    setNewVac({
-      patientName: '',
-      age: '',
-      vaccineName: 'MMR (Measles, Mumps, Rubella)',
-      doseNumber: 'Dose 1',
-      dueDate: '',
-      administeredBy: 'Nurse Mary Joseph'
-    });
+    if (!newVac.patientName.trim() || !newVac.vaccineName.trim() || !newVac.dueDate) return;
+    setSubmitting(true);
+    try {
+      await vaccinationApi.createVaccination(newVac);
+      setIsModalOpen(false);
+      setNewVac({
+        patientName: '',
+        age: '6 Months',
+        vaccineName: 'MMR (Measles, Mumps, Rubella)',
+        doseNumber: 'Dose 1',
+        dueDate: '',
+        administeredDate: '',
+        administeredBy: 'Nurse Mary Joseph',
+        status: 'Scheduled'
+      });
+      fetchAll();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to record vaccination');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleMarkAdministered = (id) => {
-    setVaccinations((prev) =>
-      prev.map((v) =>
-        v.id === id
-          ? { ...v, status: 'Completed', administeredDate: new Date().toISOString().split('T')[0], administeredBy: 'Nurse Mary Joseph' }
-          : v
-      )
-    );
+  const handleToggleStatus = async (id, currentStatus) => {
+    const nextStatus = currentStatus === 'Scheduled' ? 'Completed' : 'Scheduled';
+    const administeredDate = nextStatus === 'Completed' ? new Date().toISOString().split('T')[0] : null;
+    const administeredBy = nextStatus === 'Completed' ? 'Nurse Mary Joseph' : 'Pending Appointment';
+    try {
+      await vaccinationApi.updateVaccination(id, { status: nextStatus, administeredDate, administeredBy });
+      fetchAll();
+    } catch (err) {
+      alert('Failed to update status');
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this vaccination record?')) return;
+    try {
+      await vaccinationApi.deleteVaccination(id);
+      fetchAll();
+    } catch {
+      alert('Failed to delete record');
+    }
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', fontFamily: 'Inter, sans-serif' }}>
+    <div className="page-content" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
-      {/* 1. Header Banner */}
+      {/* Header Banner */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: '800', color: '#0F172A', marginBottom: '0.2rem' }}>
-            Vaccination & Immunization Tracker
+          <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Syringe size={26} color="#0066FF" /> Immunization &amp; Vaccinations
           </h1>
-          <p style={{ color: '#64748B', fontSize: '0.86rem' }}>
-            Pediatric and adult immunization schedule management, dose administration logging, and due date alerts
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', margin: '4px 0 0' }}>
+            Schedule and track immunization schedules, administered doses, and pediatric health charts
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
-          <div className="header-search" style={{ width: '220px' }}>
-            <Search size={15} color="#64748B" />
+          <div style={{ flex: 1, minWidth: 220, display: 'flex', alignItems: 'center', gap: 8, background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 10, padding: '0 12px' }}>
+            <Search size={15} color="#94A3B8" />
             <input
               type="text"
-              placeholder="Search Vaccine or Patient..."
+              placeholder="Search Patient, Vaccine or ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ fontSize: '0.82rem' }}
+              style={{ border: 'none', background: 'transparent', outline: 'none', padding: '0.5rem 0', fontSize: '0.82rem', color: 'var(--text-main)', width: '100%', fontFamily: 'var(--font-primary)' }}
             />
           </div>
 
-          <select
-            className="filter-select"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            style={{ fontSize: '0.82rem', padding: '0.45rem 1.8rem 0.45rem 0.85rem' }}
-          >
-            <option value="All">All Statuses</option>
-            <option value="Completed">Completed</option>
-            <option value="Scheduled">Scheduled</option>
-            <option value="Overdue">Overdue</option>
-          </select>
-
           <button
-            className="btn btn-primary btn-sm"
+            className="btn btn-primary"
             onClick={() => setIsModalOpen(true)}
-            style={{ padding: '0.45rem 0.95rem', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
           >
-            <Plus size={16} /> Record Vaccine Dose
+            <Plus size={16} /> Record Vaccination
           </button>
         </div>
       </div>
 
-      {/* 2. Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+      {/* Stat Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
         <div className="card" style={{ padding: '1.25rem', border: '1px solid #E2E8F0', borderRadius: '16px', background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#3B82F6', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Syringe size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.78rem', color: '#1E3A8A', fontWeight: '700' }}>TOTAL VACCINATION DOSES</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#1E3A8A', marginTop: '0.1rem' }}>{totalCount}</div>
+            <div style={{ fontSize: '0.78rem', color: '#1E3A8A', fontWeight: '700' }}>TOTAL SCHEDULED</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#1E3A8A', marginTop: '0.1rem' }}>{stats.total || 0}</div>
           </div>
         </div>
 
@@ -199,145 +158,173 @@ const VaccinationsPage = () => {
             <CheckCircle2 size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.78rem', color: '#064E3B', fontWeight: '700' }}>ADMINISTERED & PROTECTED</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#064E3B', marginTop: '0.1rem' }}>{completedCount}</div>
+            <div style={{ fontSize: '0.78rem', color: '#064E3B', fontWeight: '700' }}>ADMINISTERED COMPLETED</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#064E3B', marginTop: '0.1rem' }}>{stats.completed || 0}</div>
           </div>
         </div>
 
-        <div className="card" style={{ padding: '1.25rem', border: '1px solid #E2E8F0', borderRadius: '16px', background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div className="card" style={{ padding: '1.25rem', border: '1px solid #E2E8F0', borderRadius: '16px', background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#F59E0B', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Clock size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.78rem', color: '#78350F', fontWeight: '700' }}>UPCOMING DUE DOSES</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#78350F', marginTop: '0.1rem' }}>{scheduledCount}</div>
+            <div style={{ fontSize: '0.78rem', color: '#78350F', fontWeight: '700' }}>UPCOMING DUEDATES</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#78350F', marginTop: '0.1rem' }}>{stats.scheduled || 0}</div>
           </div>
         </div>
 
-        <div className="card" style={{ padding: '1.25rem', border: '1px solid #E2E8F0', borderRadius: '16px', background: 'linear-gradient(135deg, #FEE2E2 0%, #FCA5A5 100%)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div className="card" style={{ padding: '1.25rem', border: '1px solid #E2E8F0', borderRadius: '16px', background: 'linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#EF4444', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <AlertCircle size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.78rem', color: '#7F1D1D', fontWeight: '700' }}>OVERDUE ALERTS</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#7F1D1D', marginTop: '0.1rem' }}>{overdueCount}</div>
+            <div style={{ fontSize: '0.78rem', color: '#7F1D1D', fontWeight: '700' }}>OVERDUE WARNINGS</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#7F1D1D', marginTop: '0.1rem' }}>{stats.overdue || 0}</div>
           </div>
         </div>
       </div>
 
-      {/* 3. Table */}
-      <div className="card" style={{ padding: '1.25rem' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="doc-table">
-            <thead>
-              <tr>
-                <th>Patient Details</th>
-                <th>Vaccine & Dose</th>
-                <th>Due Date</th>
-                <th>Administered Date</th>
-                <th>Administered By</th>
-                <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredVaccinations.length > 0 ? (
-                filteredVaccinations.map((vac) => (
-                  <tr key={vac.id}>
-                    <td>
-                      <div>
-                        <div style={{ fontWeight: '700', color: '#0F172A', fontSize: '0.9rem' }}>{vac.patientName}</div>
-                        <div style={{ fontSize: '0.76rem', color: '#94A3B8' }}>{vac.id} • {vac.age}</div>
-                      </div>
-                    </td>
-
-                    <td>
-                      <div>
-                        <div style={{ fontWeight: '700', color: '#0066FF', fontSize: '0.85rem' }}>{vac.vaccineName}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748B' }}>{vac.doseNumber}</div>
-                      </div>
-                    </td>
-
-                    <td>
-                      <span style={{ fontSize: '0.84rem', color: '#334155', fontWeight: '600' }}>{vac.dueDate}</span>
-                    </td>
-
-                    <td>
-                      <span style={{ fontSize: '0.84rem', color: '#64748B' }}>{vac.administeredDate || '—'}</span>
-                    </td>
-
-                    <td>
-                      <span style={{ fontSize: '0.82rem', color: '#475569' }}>{vac.administeredBy}</span>
-                    </td>
-
-                    <td>
-                      <span
-                        className={`badge ${
-                          vac.status === 'Completed' ? 'badge-success' : vac.status === 'Scheduled' ? 'badge-warning' : 'badge-danger'
-                        }`}
-                        style={{ fontSize: '0.75rem' }}
-                      >
-                        {vac.status}
-                      </span>
-                    </td>
-
-                    <td style={{ textAlign: 'right' }}>
-                      {vac.status !== 'Completed' && (
-                        <button
-                          onClick={() => handleMarkAdministered(vac.id)}
-                          style={{ padding: '0.35rem 0.65rem', borderRadius: '8px', border: 'none', background: '#ECFDF5', color: '#10B981', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer' }}
-                        >
-                          Mark Given
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: '#64748B' }}>
-                    No vaccination records found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* 4. Modal: Record Vaccine */}
-      {isModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(15, 23, 42, 0.55)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '1rem'
-          }}
-        >
-          <div
-            className="card"
+      {/* Filter Options */}
+      <div className="card" style={{ padding: '0.9rem 1.2rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#475569' }}>Filter Status:</span>
+        {['All', 'Scheduled', 'Completed', 'Overdue'].map((status) => (
+          <button
+            key={status}
+            onClick={() => setStatusFilter(status)}
+            className="btn btn-secondary btn-sm"
             style={{
-              width: '100%',
-              maxWidth: '500px',
-              padding: '1.75rem',
-              borderRadius: '20px',
-              background: '#FFFFFF'
+              padding: '0.4rem 0.9rem',
+              fontSize: '0.8rem',
+              borderRadius: '999px',
+              backgroundColor: statusFilter === status ? '#0066FF' : '#FFFFFF',
+              color: statusFilter === status ? '#FFFFFF' : 'var(--text-main)',
+              borderColor: statusFilter === status ? '#0066FF' : '#E2E8F0',
             }}
           >
+            {status}
+          </button>
+        ))}
+      </div>
+
+      {error && (
+        <div className="alert alert-error" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <AlertCircle size={16} /> {error}
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 200, color: 'var(--text-muted)', gap: 10 }}>
+            <div className="loading-spinner" /> Loading vaccination records...
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="doc-table">
+              <thead>
+                <tr>
+                  <th>Record ID &amp; Patient</th>
+                  <th>Age Milestone</th>
+                  <th>Vaccine Details</th>
+                  <th>Due Date</th>
+                  <th>Administered Date / By</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredVaccinations.length > 0 ? (
+                  filteredVaccinations.map((v) => (
+                    <tr key={v._id}>
+                      <td>
+                        <div>
+                          <div style={{ fontWeight: '700', color: 'var(--text-main)', fontSize: '0.9rem' }}>{v.patientName}</div>
+                          <div style={{ fontSize: '0.76rem', color: '#94A3B8' }}>{v.id}</div>
+                        </div>
+                      </td>
+
+                      <td>
+                        <span style={{ fontSize: '0.82rem', color: '#334155', fontWeight: '600' }}>{v.age}</span>
+                      </td>
+
+                      <td>
+                        <div>
+                          <div style={{ fontWeight: '700', color: '#0066FF', fontSize: '0.85rem' }}>{v.vaccineName}</div>
+                          <div style={{ fontSize: '0.76rem', color: '#64748B', marginTop: '0.1rem' }}>{v.doseNumber}</div>
+                        </div>
+                      </td>
+
+                      <td>
+                        <span style={{ fontSize: '0.82rem', color: '#475569', fontWeight: '600' }}>{v.dueDate}</span>
+                      </td>
+
+                      <td>
+                        {v.administeredDate ? (
+                          <div>
+                            <div style={{ fontSize: '0.82rem', color: '#10B981', fontWeight: '700' }}>{v.administeredDate}</div>
+                            <div style={{ fontSize: '0.76rem', color: '#64748B' }}>{v.administeredBy}</div>
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '0.8rem', color: '#94A3B8', fontStyle: 'italic' }}>{v.administeredBy}</span>
+                        )}
+                      </td>
+
+                      <td>
+                        <span
+                          className={`doc-badge ${
+                            v.status === 'Completed' ? 'confirmed' : v.status === 'Scheduled' ? 'pending' : 'cancelled'
+                          }`}
+                          style={{ fontSize: '0.75rem', cursor: 'pointer' }}
+                          onClick={() => handleToggleStatus(v._id, v.status)}
+                          title="Click to toggle status"
+                        >
+                          {v.status}
+                        </span>
+                      </td>
+
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            style={{ padding: '0.35rem 0.7rem' }}
+                            onClick={() => handleToggleStatus(v._id, v.status)}
+                          >
+                            Toggle Status
+                          </button>
+                          <button
+                            className="btn btn-sm"
+                            style={{ background: '#FEE2E2', color: '#DC2626', border: '1px solid #FECACA', display: 'inline-flex', alignItems: 'center' }}
+                            onClick={() => handleDelete(v._id)}
+                          >
+                            <X size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '3.5rem', color: 'var(--text-muted)' }}>
+                      No vaccination records found matching search filters.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Modal: Add Vaccination Record */}
+      {isModalOpen && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setIsModalOpen(false)}>
+          <div className="modal-content" style={{ maxWidth: '480px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#EFF6FF', color: '#0066FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Syringe size={20} />
                 </div>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#0F172A' }}>Record Vaccine Administration</h2>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#0F172A', margin: 0 }}>Record Patient Vaccination</h2>
               </div>
               <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}>
                 <X size={20} />
@@ -345,93 +332,82 @@ const VaccinationsPage = () => {
             </div>
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                    Patient Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Master Aarav"
-                    value={newVac.patientName}
-                    onChange={(e) => setNewVac({ ...newVac, patientName: e.target.value })}
-                    style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                    Age / Category
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 6 Months"
-                    value={newVac.age}
-                    onChange={(e) => setNewVac({ ...newVac, age: e.target.value })}
-                    style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
-                  />
-                </div>
+              <div className="form-group">
+                <label>Patient Name *</label>
+                <input
+                  type="text"
+                  required
+                  className="input-field"
+                  placeholder="e.g. Baby Aarav Gupta"
+                  value={newVac.patientName}
+                  onChange={(e) => setNewVac({ ...newVac, patientName: e.target.value })}
+                />
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                  Vaccine Name *
-                </label>
+              <div className="form-group">
+                <label>Age Milestone / Current Age *</label>
                 <select
-                  value={newVac.vaccineName}
-                  onChange={(e) => setNewVac({ ...newVac, vaccineName: e.target.value })}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
+                  className="input-field"
+                  value={newVac.age}
+                  onChange={(e) => setNewVac({ ...newVac, age: e.target.value })}
                 >
-                  <option value="BCG & Hepatitis B (Birth Dose)">BCG & Hepatitis B (Birth Dose)</option>
-                  <option value="OPV & DTP Booster">OPV & DTP Booster</option>
-                  <option value="MMR (Measles, Mumps, Rubella)">MMR (Measles, Mumps, Rubella)</option>
-                  <option value="Typhoid Conjugate Vaccine">Typhoid Conjugate Vaccine</option>
-                  <option value="COVID-19 Booster Dose">COVID-19 Booster Dose</option>
+                  <option value="6 Weeks">6 Weeks</option>
+                  <option value="6 Months">6 Months</option>
+                  <option value="9 Months">9 Months</option>
+                  <option value="12 Months">12 Months</option>
+                  <option value="5 Years">5 Years</option>
+                  <option value="Adult Dose">Adult Dose</option>
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                    Dose Details
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Dose 1 of 2"
-                    value={newVac.doseNumber}
-                    onChange={(e) => setNewVac({ ...newVac, doseNumber: e.target.value })}
-                    style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                    Administered By
-                  </label>
-                  <input
-                    type="text"
-                    value={newVac.administeredBy}
-                    onChange={(e) => setNewVac({ ...newVac, administeredBy: e.target.value })}
-                    style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
-                  />
-                </div>
+              <div className="form-group">
+                <label>Vaccine Name *</label>
+                <input
+                  type="text"
+                  required
+                  className="input-field"
+                  placeholder="e.g. MMR (Measles, Mumps, Rubella)"
+                  value={newVac.vaccineName}
+                  onChange={(e) => setNewVac({ ...newVac, vaccineName: e.target.value })}
+                />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+              <div className="form-group">
+                <label>Dose Number / Description</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="e.g. Dose 1 of 2 or Booster Dose"
+                  value={newVac.doseNumber}
+                  onChange={(e) => setNewVac({ ...newVac, doseNumber: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Vaccine Scheduled Due Date *</label>
+                <input
+                  type="date"
+                  required
+                  className="input-field"
+                  value={newVac.dueDate}
+                  onChange={(e) => setNewVac({ ...newVac, dueDate: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
                 <button
                   type="button"
+                  className="btn btn-secondary"
                   onClick={() => setIsModalOpen(false)}
-                  style={{ padding: '0.55rem 1.1rem', borderRadius: '10px', border: '1px solid #CBD5E1', background: '#F8FAFC', color: '#475569', fontWeight: '600', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  style={{ padding: '0.55rem 1.25rem', borderRadius: '10px', fontWeight: '700' }}
+                  disabled={submitting}
                 >
-                  Save Record
+                  {submitting ? 'Recording...' : 'Record Vaccination'}
                 </button>
               </div>
             </form>

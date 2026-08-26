@@ -1,608 +1,523 @@
-import React, { useState, useEffect } from 'react';
-import { patientApi, authApi } from '../services/api';
+import React, { useState, useEffect, useCallback } from 'react';
+import { bedApi, authApi } from '../services/api';
 import {
-  Bed,
-  Search,
-  Plus,
-  UserCheck,
-  Building2,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  X,
-  ArrowRightLeft,
-  LogOut,
-  Shield,
-  Activity
+    BedDouble, Search, Plus, X, LayoutGrid, List,
+    AlertCircle, CheckCircle2, XCircle, AlertTriangle,
+    User, Stethoscope, ArrowRightLeft, LogOut, Trash2,
+    TrendingUp, Activity, Building2
 } from 'lucide-react';
 
-const initialBeds = [
-  { id: 'BED-101', ward: 'ICU Unit A', bedNumber: 'ICU-01', patient: 'Vikram Sharma', age: 52, gender: 'Male', doctor: 'Dr. Rahul Sharma', admitDate: '2026-08-22', status: 'Occupied', diagnosis: 'Severe Respiratory Distress' },
-  { id: 'BED-102', ward: 'ICU Unit A', bedNumber: 'ICU-02', patient: null, status: 'Available' },
-  { id: 'BED-103', ward: 'General Male Ward', bedNumber: 'GMW-05', patient: 'Rajesh Kumar', age: 44, gender: 'Male', doctor: 'Dr. Ananya Roy', admitDate: '2026-08-23', status: 'Occupied', diagnosis: 'Post-Op Appendectomy' },
-  { id: 'BED-104', ward: 'General Male Ward', bedNumber: 'GMW-06', patient: null, status: 'Cleaning' },
-  { id: 'BED-105', ward: 'Private Deluxe Suite', bedNumber: 'PVT-301', patient: 'Priya Malhotra', age: 34, gender: 'Female', doctor: 'Dr. Rahul Sharma', admitDate: '2026-08-24', status: 'Occupied', diagnosis: 'Maternal Observation' },
-  { id: 'BED-106', ward: 'Private Deluxe Suite', bedNumber: 'PVT-302', patient: null, status: 'Available' },
-  { id: 'BED-107', ward: 'Emergency Ward', bedNumber: 'EMG-01', patient: 'Sunil Verma', age: 60, gender: 'Male', doctor: 'Dr. Amit Patel', admitDate: '2026-08-25', status: 'Occupied', diagnosis: 'Acute Cardiac Observation' },
-  { id: 'BED-108', ward: 'General Female Ward', bedNumber: 'GFW-03', patient: null, status: 'Available' }
-];
+const WARDS = ['All', 'General Ward', 'ICU', 'NICU', 'CCU', 'Emergency', 'Pediatric', 'Maternity', 'Orthopedic', 'Surgical', 'Psychiatric'];
+const WARD_OPTIONS = WARDS.filter(w => w !== 'All');
+
+const STATUS_CONFIG = {
+    Available: { color: '#10B981', bg: '#D1FAE5', border: '#A7F3D0', label: 'Available', Icon: CheckCircle2 },
+    Occupied:  { color: '#EF4444', bg: '#FEE2E2', border: '#FCA5A5', label: 'Occupied',  Icon: BedDouble },
+    Cleaning:  { color: '#F59E0B', bg: '#FEF3C7', border: '#FDE68A', label: 'Cleaning',  Icon: Activity },
+};
+
+const StatCard = ({ label, value, icon, bg, color }) => (
+    <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1.1rem', padding: '1.25rem 1.5rem' }}>
+        <div style={{ width: 52, height: 52, borderRadius: 14, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {icon}
+        </div>
+        <div>
+            <p style={{ color: '#64748B', fontSize: '0.82rem', fontWeight: 600, margin: 0 }}>{label}</p>
+            <p style={{ fontSize: '1.5rem', fontWeight: 800, color: color || '#0F172A', margin: 0 }}>{value}</p>
+        </div>
+    </div>
+);
 
 const BedManagementPage = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [wardFilter, setWardFilter] = useState('All');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [beds, setBeds] = useState(() => {
-    const saved = localStorage.getItem('caresync_beds_list');
-    return saved ? JSON.parse(saved) : initialBeds;
-  });
+    const [beds, setBeds] = useState([]);
+    const [stats, setStats] = useState({ total: 0, occupied: 0, available: 0, cleaning: 0, occupancyRate: '0.0' });
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [search, setSearch] = useState('');
+    const [filterWard, setFilterWard] = useState('All');
+    const [filterStatus, setFilterStatus] = useState('All');
+    const [viewMode, setViewMode] = useState('grid');
+    const [doctors, setDoctors] = useState([]);
 
-  const [isAdmitModalOpen, setIsAdmitModalOpen] = useState(false);
-  const [transferBed, setTransferBed] = useState(null);
+    // Add bed modal
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [bedForm, setBedForm] = useState({ ward: 'General Ward', bedNumber: '' });
+    const [bedFormError, setBedFormError] = useState('');
 
-  const [admitData, setAdmitData] = useState({
-    bedId: '',
-    patientName: '',
-    age: '',
-    gender: 'Male',
-    doctor: 'Dr. Rahul Sharma',
-    diagnosis: ''
-  });
+    // Admit modal
+    const [showAdmitModal, setShowAdmitModal] = useState(false);
+    const [selectedBed, setSelectedBed] = useState(null);
+    const [admitForm, setAdmitForm] = useState({ patientName: '', age: '', gender: 'Male', doctorName: '', diagnosis: '' });
+    const [admitError, setAdmitError] = useState('');
 
-  const [targetWard, setTargetWard] = useState('General Male Ward');
-  const [patientOptions, setPatientOptions] = useState([]);
-  const [doctorOptions, setDoctorOptions] = useState([]);
+    // Transfer modal
+    const [showTransferModal, setShowTransferModal] = useState(false);
+    const [transferTargetId, setTransferTargetId] = useState('');
+    const [transferError, setTransferError] = useState('');
 
-  // Fetch real patients and doctors for admit form
-  useEffect(() => {
-    const fetchOptions = async () => {
-      try {
-        const [patientsRes, doctorsRes] = await Promise.all([
-          patientApi.getAllPatients(''),
-          authApi.getDoctors()
-        ]);
-        const pats = patientsRes.data?.patients || [];
-        const docs = doctorsRes.data?.doctors || doctorsRes.data || [];
-        if (pats.length > 0) setPatientOptions(pats.map(p => p.name));
-        if (docs.length > 0) setDoctorOptions(docs.map(d => d.name ? 'Dr. ' + d.name : 'Dr. Specialist'));
-      } catch (err) {
-        console.error('Bed management options fetch error:', err);
-      }
+    const [saving, setSaving] = useState(false);
+
+    const availableForTransfer = beds.filter(b => b.status !== 'Occupied' && b._id !== selectedBed?._id);
+    const occupancyPct = parseFloat(stats.occupancyRate) || 0;
+    const barColor = occupancyPct > 80 ? '#EF4444' : occupancyPct > 60 ? '#F59E0B' : '#10B981';
+
+    const fetchAll = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError('');
+            const [statsRes, bedsRes] = await Promise.all([
+                bedApi.getStats(),
+                bedApi.getAllBeds({
+                    search: search || undefined,
+                    ward: filterWard !== 'All' ? filterWard : undefined,
+                    status: filterStatus !== 'All' ? filterStatus : undefined,
+                })
+            ]);
+            setStats(statsRes.data.data || {});
+            setBeds(bedsRes.data.data || []);
+        } catch {
+            setError('Failed to load bed data. Please check the server connection.');
+        } finally {
+            setLoading(false);
+        }
+    }, [search, filterWard, filterStatus]);
+
+    useEffect(() => { fetchAll(); }, [fetchAll]);
+    useEffect(() => {
+        authApi.getDoctors().then(r => setDoctors(r.data.doctors || r.data || [])).catch(() => setDoctors([]));
+    }, []);
+
+    const handleAddBed = async (e) => {
+        e.preventDefault();
+        setBedFormError('');
+        if (!bedForm.bedNumber.trim()) { setBedFormError('Bed number is required.'); return; }
+        setSaving(true);
+        try {
+            await bedApi.createBed(bedForm);
+            setShowAddModal(false);
+            fetchAll();
+        } catch (err) {
+            setBedFormError(err?.response?.data?.message || 'Failed to add bed.');
+        } finally { setSaving(false); }
     };
-    fetchOptions();
-  }, []);
 
-  useEffect(() => {
-    localStorage.setItem('caresync_beds_list', JSON.stringify(beds));
-  }, [beds]);
+    const handleAdmit = async (e) => {
+        e.preventDefault();
+        setAdmitError('');
+        if (!admitForm.patientName || !admitForm.doctorName || !admitForm.diagnosis) {
+            setAdmitError('Patient name, doctor, and diagnosis are required.');
+            return;
+        }
+        setSaving(true);
+        try {
+            await bedApi.admitPatient(selectedBed._id, admitForm);
+            setShowAdmitModal(false);
+            fetchAll();
+        } catch (err) {
+            setAdmitError(err?.response?.data?.message || 'Admit failed.');
+        } finally { setSaving(false); }
+    };
 
-  const wards = ['All', 'ICU Unit A', 'General Male Ward', 'General Female Ward', 'Private Deluxe Suite', 'Emergency Ward'];
+    const handleDischarge = async (bed) => {
+        if (!window.confirm(`Discharge ${bed.patientName} from ${bed.bedNumber}?`)) return;
+        try {
+            const res = await bedApi.dischargePatient(bed._id);
+            alert(res.data.message || 'Patient discharged successfully.');
+            fetchAll();
+        } catch (err) { alert(err?.response?.data?.message || 'Discharge failed.'); }
+    };
 
-  const filteredBeds = beds.filter((b) => {
-    const matchesSearch =
-      b.bedNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.ward.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (b.patient && b.patient.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesWard = wardFilter === 'All' || b.ward === wardFilter;
-    const matchesStatus = statusFilter === 'All' || b.status === statusFilter;
-    return matchesSearch && matchesWard && matchesStatus;
-  });
+    const handleTransfer = async (e) => {
+        e.preventDefault();
+        setTransferError('');
+        if (!transferTargetId) { setTransferError('Please select a target bed.'); return; }
+        setSaving(true);
+        try {
+            const res = await bedApi.transferPatient(selectedBed._id, { targetBedId: transferTargetId });
+            alert(res.data.message || 'Patient transferred successfully.');
+            setShowTransferModal(false);
+            fetchAll();
+        } catch (err) {
+            setTransferError(err?.response?.data?.message || 'Transfer failed.');
+        } finally { setSaving(false); }
+    };
 
-  // Metrics
-  const totalBeds = beds.length;
-  const occupiedCount = beds.filter((b) => b.status === 'Occupied').length;
-  const availableCount = beds.filter((b) => b.status === 'Available').length;
-  const occupancyRate = ((occupiedCount / totalBeds) * 100).toFixed(0);
+    const handleMarkAvailable = async (id) => {
+        try { await bedApi.updateBed(id, { status: 'Available' }); fetchAll(); }
+        catch { alert('Failed to update bed status.'); }
+    };
 
-  const handleAdmitSubmit = (e) => {
-    e.preventDefault();
-    if (!admitData.bedId || !admitData.patientName) return;
+    const handleDeleteBed = async (id) => {
+        if (!window.confirm('Remove this bed from the system?')) return;
+        try { await bedApi.deleteBed(id); fetchAll(); }
+        catch (err) { alert(err?.response?.data?.message || 'Delete failed.'); }
+    };
 
-    setBeds((prev) =>
-      prev.map((b) =>
-        b.id === admitData.bedId
-          ? {
-              ...b,
-              patient: admitData.patientName,
-              age: Number(admitData.age) || 30,
-              gender: admitData.gender,
-              doctor: admitData.doctor,
-              admitDate: new Date().toISOString().split('T')[0],
-              status: 'Occupied',
-              diagnosis: admitData.diagnosis || 'Inpatient Observation'
-            }
-          : b
-      )
-    );
-
-    setIsAdmitModalOpen(false);
-    setAdmitData({
-      bedId: '',
-      patientName: '',
-      age: '',
-      gender: 'Male',
-      doctor: 'Dr. Rahul Sharma',
-      diagnosis: ''
-    });
-  };
-
-  const handleDischarge = (bedId, patientName) => {
-    if (window.confirm(`Are you sure you want to discharge patient "${patientName}" from this bed?`)) {
-      setBeds((prev) =>
-        prev.map((b) => (b.id === bedId ? { ...b, patient: null, status: 'Cleaning' } : b))
-      );
-    }
-  };
-
-  const handleSetAvailable = (bedId) => {
-    setBeds((prev) => prev.map((b) => (b.id === bedId ? { ...b, status: 'Available' } : b)));
-  };
-
-  const handleTransferSubmit = (e) => {
-    e.preventDefault();
-    if (!transferBed) return;
-
-    setBeds((prev) =>
-      prev.map((b) => (b.id === transferBed.id ? { ...b, ward: targetWard } : b))
-    );
-    setTransferBed(null);
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', fontFamily: 'Inter, sans-serif' }}>
-      
-      {/* 1. Header Banner */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: '800', color: '#0F172A', marginBottom: '0.2rem' }}>
-            Bed & Ward Occupancy Management (IPD)
-          </h1>
-          <p style={{ color: '#64748B', fontSize: '0.86rem' }}>
-            Track inpatient admissions, real-time bed availability, ward transfers, and patient discharge workflow
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
-          <div className="header-search" style={{ width: '220px' }}>
-            <Search size={15} color="#64748B" />
-            <input
-              type="text"
-              placeholder="Search Bed, Ward or Patient..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ fontSize: '0.82rem' }}
-            />
-          </div>
-
-          <select
-            className="filter-select"
-            value={wardFilter}
-            onChange={(e) => setWardFilter(e.target.value)}
-            style={{ fontSize: '0.82rem', padding: '0.45rem 1.8rem 0.45rem 0.85rem' }}
-          >
-            {wards.map((w) => (
-              <option key={w} value={w}>{w === 'All' ? 'All Wards' : w}</option>
-            ))}
-          </select>
-
-          <select
-            className="filter-select"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            style={{ fontSize: '0.82rem', padding: '0.45rem 1.8rem 0.45rem 0.85rem' }}
-          >
-            <option value="All">All Statuses</option>
-            <option value="Occupied">Occupied</option>
-            <option value="Available">Available</option>
-            <option value="Cleaning">Cleaning</option>
-          </select>
-
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={() => setIsAdmitModalOpen(true)}
-            style={{ padding: '0.45rem 0.95rem', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
-          >
-            <Plus size={16} /> Admit Patient to Bed
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Top Summary Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-        <div className="card" style={{ padding: '1.25rem', border: '1px solid #E2E8F0', borderRadius: '16px', background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#3B82F6', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Bed size={22} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.78rem', color: '#1E3A8A', fontWeight: '700' }}>TOTAL HOSPITAL BEDS</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#1E3A8A', marginTop: '0.1rem' }}>{totalBeds}</div>
-          </div>
-        </div>
-
-        <div className="card" style={{ padding: '1.25rem', border: '1px solid #E2E8F0', borderRadius: '16px', background: 'linear-gradient(135deg, #FEE2E2 0%, #FCA5A5 100%)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#EF4444', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <UserCheck size={22} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.78rem', color: '#7F1D1D', fontWeight: '700' }}>OCCUPIED BEDS (IPD)</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#7F1D1D', marginTop: '0.1rem' }}>{occupiedCount} ({occupancyRate}%)</div>
-          </div>
-        </div>
-
-        <div className="card" style={{ padding: '1.25rem', border: '1px solid #E2E8F0', borderRadius: '16px', background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#10B981', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <CheckCircle2 size={22} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.78rem', color: '#064E3B', fontWeight: '700' }}>VACANT & READY BEDS</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#064E3B', marginTop: '0.1rem' }}>{availableCount}</div>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Bed Management Table */}
-      <div className="card" style={{ padding: '1.25rem' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="doc-table">
-            <thead>
-              <tr>
-                <th>Bed No. & Ward</th>
-                <th>Patient Details</th>
-                <th>Diagnosis & Doctor</th>
-                <th>Admit Date</th>
-                <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredBeds.length > 0 ? (
-                filteredBeds.map((bed) => (
-                  <tr key={bed.id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div
-                          style={{
-                            width: '38px',
-                            height: '38px',
-                            borderRadius: '10px',
-                            background: bed.status === 'Occupied' ? '#FEE2E2' : bed.status === 'Available' ? '#D1FAE5' : '#FEF3C7',
-                            color: bed.status === 'Occupied' ? '#DC2626' : bed.status === 'Available' ? '#059669' : '#D97706',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                        >
-                          <Bed size={20} />
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: '800', color: '#0F172A', fontSize: '0.9rem' }}>{bed.bedNumber}</div>
-                          <div style={{ fontSize: '0.76rem', color: '#64748B' }}>{bed.ward}</div>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td>
-                      {bed.patient ? (
-                        <div>
-                          <div style={{ fontWeight: '700', color: '#334155', fontSize: '0.88rem' }}>{bed.patient}</div>
-                          <div style={{ fontSize: '0.75rem', color: '#64748B' }}>{bed.age} Yrs • {bed.gender}</div>
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: '0.82rem', color: '#94A3B8', italic: 'true' }}>No Patient Admitted</span>
-                      )}
-                    </td>
-
-                    <td>
-                      {bed.patient ? (
-                        <div>
-                          <div style={{ fontWeight: '600', color: '#0F172A', fontSize: '0.84rem' }}>{bed.diagnosis}</div>
-                          <div style={{ fontSize: '0.75rem', color: '#0066FF' }}>{bed.doctor}</div>
-                        </div>
-                      ) : (
-                        <span style={{ color: '#CBD5E1' }}>—</span>
-                      )}
-                    </td>
-
-                    <td>
-                      <span style={{ fontSize: '0.82rem', color: '#64748B' }}>{bed.admitDate || '—'}</span>
-                    </td>
-
-                    <td>
-                      <span
-                        style={{
-                          padding: '0.25rem 0.65rem',
-                          borderRadius: '8px',
-                          fontSize: '0.75rem',
-                          fontWeight: '700',
-                          background: bed.status === 'Occupied' ? '#FEE2E2' : bed.status === 'Available' ? '#DCFCE7' : '#FEF3C7',
-                          color: bed.status === 'Occupied' ? '#991B1B' : bed.status === 'Available' ? '#166534' : '#92400E'
-                        }}
-                      >
-                        {bed.status}
-                      </span>
-                    </td>
-
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
-                        {bed.status === 'Occupied' && (
-                          <>
-                            <button
-                              className="action-btn"
-                              title="Ward Transfer"
-                              onClick={() => {
-                                setTransferBed(bed);
-                                setTargetWard(bed.ward);
-                              }}
-                              style={{ color: '#8B5CF6', background: '#F5F3FF', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '8px', fontSize: '0.78rem', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-                            >
-                              <ArrowRightLeft size={14} /> Transfer
-                            </button>
-
-                            <button
-                              className="action-btn"
-                              title="Discharge Patient"
-                              onClick={() => handleDischarge(bed.id, bed.patient)}
-                              style={{ color: '#EF4444', background: '#FEE2E2', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '8px', fontSize: '0.78rem', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-                            >
-                              <LogOut size={14} /> Discharge
-                            </button>
-                          </>
-                        )}
-
-                        {bed.status === 'Cleaning' && (
-                          <button
-                            className="action-btn"
-                            title="Mark Bed Ready"
-                            onClick={() => handleSetAvailable(bed.id)}
-                            style={{ color: '#10B981', background: '#ECFDF5', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '8px', fontSize: '0.78rem', fontWeight: '600' }}
-                          >
-                            Mark Ready
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: '#64748B' }}>
-                    No beds found matching filter criteria.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* 4. Modal: Admit Patient to Available Bed */}
-      {isAdmitModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(15, 23, 42, 0.55)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '1rem'
-          }}
-        >
-          <div
-            className="card"
-            style={{
-              width: '100%',
-              maxWidth: '520px',
-              padding: '1.75rem',
-              borderRadius: '20px',
-              background: '#FFFFFF',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#EFF6FF', color: '#0066FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Bed size={20} />
+    return (
+        <div className="page-content">
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <BedDouble size={26} color="#0066FF" /> Bed &amp; Ward Management
+                    </h1>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', margin: '4px 0 0' }}>
+                        Real-time bed occupancy, patient admission, discharge &amp; transfer
+                    </p>
                 </div>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#0F172A' }}>Inpatient Bed Admission</h2>
-              </div>
-              <button onClick={() => setIsAdmitModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}>
-                <X size={20} />
-              </button>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button className="btn btn-secondary" onClick={() => setViewMode(v => v === 'grid' ? 'table' : 'grid')}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        {viewMode === 'grid' ? <><List size={16} /> Table View</> : <><LayoutGrid size={16} /> Grid View</>}
+                    </button>
+                    <button className="btn btn-primary" onClick={() => { setBedForm({ ward: 'General Ward', bedNumber: '' }); setBedFormError(''); setShowAddModal(true); }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <Plus size={16} /> Add Bed
+                    </button>
+                </div>
             </div>
 
-            <form onSubmit={handleAdmitSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                  Select Vacant Bed *
-                </label>
-                <select
-                  required
-                  value={admitData.bedId}
-                  onChange={(e) => setAdmitData({ ...admitData, bedId: e.target.value })}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
-                >
-                  <option value="">-- Choose Available Bed --</option>
-                  {beds.filter((b) => b.status === 'Available').map((b) => (
-                    <option key={b.id} value={b.id}>{b.bedNumber} ({b.ward})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                  Patient Full Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Ramesh Chandra"
-                  value={admitData.patientName}
-                  onChange={(e) => setAdmitData({ ...admitData, patientName: e.target.value })}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                    Age
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="45"
-                    value={admitData.age}
-                    onChange={(e) => setAdmitData({ ...admitData, age: e.target.value })}
-                    style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                    Gender
-                  </label>
-                  <select
-                    value={admitData.gender}
-                    onChange={(e) => setAdmitData({ ...admitData, gender: e.target.value })}
-                    style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
-                  >
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                  Attending Doctor
-                </label>
-                <select
-                  value={admitData.doctor}
-                  onChange={(e) => setAdmitData({ ...admitData, doctor: e.target.value })}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
-                >
-                  <option value="Dr. Rahul Sharma">Dr. Rahul Sharma (Cardiologist)</option>
-                  <option value="Dr. Ananya Roy">Dr. Ananya Roy (General Medicine)</option>
-                  <option value="Dr. Amit Patel">Dr. Amit Patel (Emergency Specialist)</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                  Primary Admission Diagnosis
-                </label>
-                <textarea
-                  rows="2"
-                  placeholder="e.g. Acute Dengue Fever with low platelet count..."
-                  value={admitData.diagnosis}
-                  onChange={(e) => setAdmitData({ ...admitData, diagnosis: e.target.value })}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setIsAdmitModalOpen(false)}
-                  style={{ padding: '0.55rem 1.1rem', borderRadius: '10px', border: '1px solid #CBD5E1', background: '#F8FAFC', color: '#475569', fontWeight: '600', cursor: 'pointer' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  style={{ padding: '0.55rem 1.25rem', borderRadius: '10px', fontWeight: '700' }}
-                >
-                  Admit Patient
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 5. Modal: Ward Transfer */}
-      {transferBed && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(15, 23, 42, 0.55)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '1rem'
-          }}
-        >
-          <div
-            className="card"
-            style={{
-              width: '100%',
-              maxWidth: '450px',
-              padding: '1.75rem',
-              borderRadius: '20px',
-              background: '#FFFFFF'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h2 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0F172A' }}>Ward Transfer: {transferBed.patient}</h2>
-              <button onClick={() => setTransferBed(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}>
-                <X size={20} />
-              </button>
+            {/* Stats */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '1rem' }}>
+                <StatCard label="Total Beds"     value={stats.total || 0}              icon={<BedDouble size={24} color="#0066FF" />}     bg="#EEF4FF"  color="#0066FF" />
+                <StatCard label="Occupied"        value={stats.occupied || 0}            icon={<BedDouble size={24} color="#EF4444" />}     bg="#FEE2E2"  color="#EF4444" />
+                <StatCard label="Available"       value={stats.available || 0}           icon={<CheckCircle2 size={24} color="#10B981" />}  bg="#D1FAE5"  color="#10B981" />
+                <StatCard label="Cleaning"        value={stats.cleaning || 0}            icon={<Activity size={24} color="#F59E0B" />}      bg="#FEF3C7"  color="#F59E0B" />
+                <StatCard label="Occupancy Rate"  value={`${stats.occupancyRate || 0}%`} icon={<TrendingUp size={24} color="#8B5CF6" />}    bg="#F3E8FF"  color="#8B5CF6" />
             </div>
 
-            <form onSubmit={handleTransferSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <span style={{ fontSize: '0.82rem', color: '#64748B' }}>Current Bed & Ward:</span>
-                <div style={{ fontSize: '0.92rem', fontWeight: '700', color: '#0F172A', marginTop: '0.2rem' }}>{transferBed.bedNumber} ({transferBed.ward})</div>
-              </div>
+            {/* Occupancy Bar */}
+            <div className="card" style={{ padding: '1rem 1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <TrendingUp size={16} color="#64748B" /> Overall Bed Occupancy
+                    </span>
+                    <span style={{ fontWeight: 800, fontSize: '1rem', color: barColor }}>{stats.occupancyRate || 0}%</span>
+                </div>
+                <div style={{ height: 10, background: '#E2E8F0', borderRadius: 99, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.min(occupancyPct, 100)}%`, background: barColor, borderRadius: 99, transition: 'width 0.6s ease' }} />
+                </div>
+                <div style={{ display: 'flex', gap: '1.5rem', marginTop: 10, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><BedDouble size={13} color="#EF4444" /> {stats.occupied || 0} occupied</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={13} color="#10B981" /> {stats.available || 0} available</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Activity size={13} color="#F59E0B" /> {stats.cleaning || 0} cleaning</span>
+                </div>
+            </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                  Target Destination Ward
-                </label>
-                <select
-                  value={targetWard}
-                  onChange={(e) => setTargetWard(e.target.value)}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.88rem' }}
-                >
-                  {wards.filter((w) => w !== 'All').map((w) => (
-                    <option key={w} value={w}>{w}</option>
-                  ))}
+            {/* Filters */}
+            <div className="card" style={{ padding: '0.9rem 1.2rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ flex: 1, minWidth: 200, display: 'flex', alignItems: 'center', gap: 8, background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 10, padding: '0 12px' }}>
+                    <Search size={16} color="#94A3B8" />
+                    <input type="text" placeholder="Search by bed, patient, ward..."
+                        value={search} onChange={e => setSearch(e.target.value)}
+                        style={{ border: 'none', background: 'transparent', outline: 'none', padding: '0.6rem 0', fontSize: '0.9rem', color: 'var(--text-main)', width: '100%', fontFamily: 'var(--font-primary)' }} />
+                </div>
+                <select className="input-field" value={filterWard} onChange={e => setFilterWard(e.target.value)} style={{ width: 'auto' }}>
+                    {WARDS.map(w => <option key={w}>{w}</option>)}
                 </select>
-              </div>
+                <select className="input-field" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ width: 'auto' }}>
+                    {['All', 'Available', 'Occupied', 'Cleaning'].map(s => <option key={s}>{s}</option>)}
+                </select>
+            </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setTransferBed(null)}
-                  style={{ padding: '0.55rem 1.1rem', borderRadius: '10px', border: '1px solid #CBD5E1', background: '#F8FAFC', color: '#475569', fontWeight: '600', cursor: 'pointer' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  style={{ padding: '0.55rem 1.25rem', borderRadius: '10px', fontWeight: '700' }}
-                >
-                  Confirm Transfer
-                </button>
-              </div>
-            </form>
-          </div>
+            {error && (
+                <div className="alert alert-error" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <AlertCircle size={16} /> {error}
+                </div>
+            )}
+
+            {loading ? (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 220, gap: 12, color: 'var(--text-muted)' }}>
+                    <div className="loading-spinner" /><span>Loading beds...</span>
+                </div>
+            ) : viewMode === 'grid' ? (
+                /* ── Grid View ── */
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
+                    {beds.length === 0 ? (
+                        <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
+                            <BedDouble size={48} color="#E2E8F0" style={{ display: 'block', margin: '0 auto 14px' }} />
+                            No beds found. Click "+ Add Bed" to register beds.
+                        </div>
+                    ) : beds.map(bed => {
+                        const sc = STATUS_CONFIG[bed.status] || STATUS_CONFIG.Available;
+                        const StatusIcon = sc.Icon;
+                        return (
+                            <div key={bed._id} className="card" style={{ padding: '1.1rem', borderTop: `3px solid ${sc.color}` }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                                    <div>
+                                        <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <BedDouble size={17} color={sc.color} /> {bed.bedNumber}
+                                        </div>
+                                        <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                            <Building2 size={12} /> {bed.ward}
+                                        </div>
+                                    </div>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 99, fontSize: '0.75rem', fontWeight: 700, background: sc.bg, color: sc.color }}>
+                                        <StatusIcon size={12} /> {sc.label}
+                                    </span>
+                                </div>
+
+                                {bed.status === 'Occupied' ? (
+                                    <>
+                                        <div style={{ background: '#F8FAFC', borderRadius: 8, padding: '0.7rem 0.85rem', marginBottom: 10 }}>
+                                            <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                                <User size={14} color="#0066FF" /> {bed.patientName}
+                                            </div>
+                                            <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>{bed.gender}, {bed.age}y</div>
+                                            <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: 2 }}>
+                                                <span style={{ fontWeight: 600 }}>Dx:</span> {bed.diagnosis}
+                                            </div>
+                                            <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                <Stethoscope size={11} /> {bed.doctorName}
+                                            </div>
+                                            {bed.admitDate && (
+                                                <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: 2 }}>
+                                                    Admitted: {bed.admitDate}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div style={{ display: 'flex', gap: 6 }}>
+                                            <button className="btn btn-secondary btn-sm" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+                                                onClick={() => { setSelectedBed(bed); setTransferTargetId(''); setTransferError(''); setShowTransferModal(true); }}>
+                                                <ArrowRightLeft size={13} /> Transfer
+                                            </button>
+                                            <button className="btn btn-sm" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, background: '#FEE2E2', color: '#DC2626', border: '1px solid #FECACA' }}
+                                                onClick={() => handleDischarge(bed)}>
+                                                <LogOut size={13} /> Discharge
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div style={{ color: 'var(--text-muted)', fontSize: '0.84rem', margin: '8px 0 12px' }}>
+                                            {bed.status === 'Available' ? 'Bed is ready for patient admission.' : 'Bed is being cleaned / prepared.'}
+                                        </div>
+                                        <div style={{ display: 'flex', gap: 6 }}>
+                                            {bed.status === 'Available' && (
+                                                <button className="btn btn-primary btn-sm" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+                                                    onClick={() => { setSelectedBed(bed); setAdmitForm({ patientName: '', age: '', gender: 'Male', doctorName: '', diagnosis: '' }); setAdmitError(''); setShowAdmitModal(true); }}>
+                                                    <Plus size={13} /> Admit Patient
+                                                </button>
+                                            )}
+                                            {bed.status === 'Cleaning' && (
+                                                <button className="btn btn-sm" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, background: '#D1FAE5', color: '#065F46', border: '1px solid #A7F3D0' }}
+                                                    onClick={() => handleMarkAvailable(bed._id)}>
+                                                    <CheckCircle2 size={13} /> Mark Available
+                                                </button>
+                                            )}
+                                            <button className="btn btn-sm" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#F1F5F9', color: '#94A3B8', border: '1px solid #E2E8F0' }}
+                                                onClick={() => handleDeleteBed(bed._id)}>
+                                                <Trash2 size={13} />
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            ) : (
+                /* ── Table View ── */
+                <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                    <table className="doc-table">
+                        <thead>
+                            <tr>
+                                <th>Bed ID</th>
+                                <th>Bed No.</th>
+                                <th>Ward</th>
+                                <th>Status</th>
+                                <th>Patient</th>
+                                <th>Doctor</th>
+                                <th>Admit Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {beds.length === 0 ? (
+                                <tr><td colSpan={8} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>No beds found.</td></tr>
+                            ) : beds.map(bed => {
+                                const sc = STATUS_CONFIG[bed.status] || STATUS_CONFIG.Available;
+                                const StatusIcon = sc.Icon;
+                                return (
+                                    <tr key={bed._id}>
+                                        <td><span style={{ fontWeight: 700, color: '#0066FF', fontSize: '0.82rem', fontFamily: 'monospace', background: '#EEF4FF', padding: '3px 8px', borderRadius: 6 }}>{bed.bedId}</span></td>
+                                        <td><strong>{bed.bedNumber}</strong></td>
+                                        <td style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>{bed.ward}</td>
+                                        <td>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 99, fontSize: '0.75rem', fontWeight: 700, background: sc.bg, color: sc.color }}>
+                                                <StatusIcon size={12} /> {sc.label}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {bed.patientName
+                                                ? <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><User size={14} color="#64748B" /><span style={{ fontWeight: 600 }}>{bed.patientName}</span></div>
+                                                : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                                        </td>
+                                        <td style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                                            {bed.doctorName ? <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><Stethoscope size={13} color="#94A3B8" /> {bed.doctorName}</span> : '—'}
+                                        </td>
+                                        <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{bed.admitDate || '—'}</td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                                                {bed.status === 'Available' && (
+                                                    <button className="btn btn-primary btn-sm" onClick={() => { setSelectedBed(bed); setAdmitForm({ patientName: '', age: '', gender: 'Male', doctorName: '', diagnosis: '' }); setAdmitError(''); setShowAdmitModal(true); }}
+                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Plus size={12} /> Admit</button>
+                                                )}
+                                                {bed.status === 'Occupied' && (<>
+                                                    <button className="btn btn-secondary btn-sm" onClick={() => { setSelectedBed(bed); setTransferTargetId(''); setTransferError(''); setShowTransferModal(true); }}
+                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><ArrowRightLeft size={12} /> Transfer</button>
+                                                    <button className="btn btn-sm" onClick={() => handleDischarge(bed)}
+                                                        style={{ background: '#FEE2E2', color: '#DC2626', border: '1px solid #FECACA', display: 'inline-flex', alignItems: 'center', gap: 4 }}><LogOut size={12} /> Discharge</button>
+                                                </>)}
+                                                {bed.status === 'Cleaning' && (
+                                                    <button className="btn btn-sm" onClick={() => handleMarkAvailable(bed._id)}
+                                                        style={{ background: '#D1FAE5', color: '#065F46', border: '1px solid #A7F3D0', display: 'inline-flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={12} /> Available</button>
+                                                )}
+                                                <button className="btn btn-sm" onClick={() => handleDeleteBed(bed._id)}
+                                                    style={{ background: '#F1F5F9', color: '#94A3B8', border: '1px solid #E2E8F0', display: 'inline-flex', alignItems: 'center' }}><Trash2 size={13} /></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* ── Add Bed Modal ── */}
+            {showAddModal && (
+                <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowAddModal(false)}>
+                    <div className="modal-content" style={{ maxWidth: 440 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <BedDouble size={18} color="#0066FF" /> Add New Bed
+                            </h2>
+                            <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={22} /></button>
+                        </div>
+                        {bedFormError && <div className="alert alert-error" style={{ marginBottom: '1rem', display: 'flex', gap: 8 }}><AlertCircle size={15} /> {bedFormError}</div>}
+                        <form onSubmit={handleAddBed}>
+                            <div className="form-group">
+                                <label>Ward *</label>
+                                <select className="input-field" value={bedForm.ward} onChange={e => setBedForm({ ...bedForm, ward: e.target.value })}>
+                                    {WARD_OPTIONS.map(w => <option key={w}>{w}</option>)}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Bed Number *</label>
+                                <input className="input-field" value={bedForm.bedNumber} onChange={e => setBedForm({ ...bedForm, bedNumber: e.target.value })} required placeholder="e.g. G-101, ICU-03" />
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
+                                <button type="submit" className="btn btn-primary" disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                    {saving ? 'Adding...' : <><Plus size={15} /> Add Bed</>}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Admit Modal ── */}
+            {showAdmitModal && selectedBed && (
+                <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowAdmitModal(false)}>
+                    <div className="modal-content">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                            <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <Plus size={18} color="#0066FF" /> Admit Patient
+                            </h2>
+                            <button onClick={() => setShowAdmitModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={22} /></button>
+                        </div>
+                        <div style={{ background: '#EEF4FF', borderRadius: 10, padding: '0.65rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <BedDouble size={16} color="#0066FF" />
+                            <span style={{ fontSize: '0.85rem', color: '#0066FF', fontWeight: 600 }}>{selectedBed.bedNumber} — {selectedBed.ward}</span>
+                        </div>
+                        {admitError && <div className="alert alert-error" style={{ marginBottom: '1rem', display: 'flex', gap: 8 }}><AlertCircle size={15} /> {admitError}</div>}
+                        <form onSubmit={handleAdmit}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div className="form-group">
+                                    <label>Patient Name *</label>
+                                    <input className="input-field" value={admitForm.patientName} onChange={e => setAdmitForm({ ...admitForm, patientName: e.target.value })} required placeholder="Full name" />
+                                </div>
+                                <div className="form-group">
+                                    <label>Age *</label>
+                                    <input className="input-field" type="number" min="0" value={admitForm.age} onChange={e => setAdmitForm({ ...admitForm, age: e.target.value })} required />
+                                </div>
+                                <div className="form-group">
+                                    <label>Gender</label>
+                                    <select className="input-field" value={admitForm.gender} onChange={e => setAdmitForm({ ...admitForm, gender: e.target.value })}>
+                                        {['Male', 'Female', 'Other'].map(g => <option key={g}>{g}</option>)}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>Attending Doctor *</label>
+                                    <select className="input-field" value={admitForm.doctorName} onChange={e => setAdmitForm({ ...admitForm, doctorName: e.target.value })} required>
+                                        <option value="">-- Select Doctor --</option>
+                                        {doctors.map(d => <option key={d._id} value={d.name}>{d.name}</option>)}
+                                    </select>
+                                </div>
+                                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                    <label>Diagnosis / Reason for Admission *</label>
+                                    <textarea className="input-field" rows={3} value={admitForm.diagnosis} onChange={e => setAdmitForm({ ...admitForm, diagnosis: e.target.value })} required style={{ resize: 'vertical' }} placeholder="e.g. Pneumonia, Post-op recovery, Acute MI..." />
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowAdmitModal(false)}>Cancel</button>
+                                <button type="submit" className="btn btn-primary" disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                    {saving ? 'Admitting...' : <><CheckCircle2 size={15} /> Admit Patient</>}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Transfer Modal ── */}
+            {showTransferModal && selectedBed && (
+                <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowTransferModal(false)}>
+                    <div className="modal-content" style={{ maxWidth: 460 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <ArrowRightLeft size={18} color="#0066FF" /> Transfer Patient
+                            </h2>
+                            <button onClick={() => setShowTransferModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={22} /></button>
+                        </div>
+                        <div style={{ background: '#F8FAFC', border: '1px solid var(--border)', borderRadius: 10, padding: '0.75rem 1rem', marginBottom: '1.25rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+                                <User size={14} color="#0066FF" />
+                                Moving <strong style={{ color: 'var(--text-main)', marginLeft: 3 }}>{selectedBed.patientName}</strong>
+                                &nbsp;from&nbsp;
+                                <span style={{ fontWeight: 700, color: '#0066FF', background: '#EEF4FF', padding: '2px 8px', borderRadius: 6 }}>{selectedBed.bedNumber}</span>
+                            </div>
+                        </div>
+                        {transferError && <div className="alert alert-error" style={{ marginBottom: '1rem', display: 'flex', gap: 8 }}><AlertCircle size={15} /> {transferError}</div>}
+                        <form onSubmit={handleTransfer}>
+                            <div className="form-group">
+                                <label>Select Target Bed *</label>
+                                <select className="input-field" value={transferTargetId} onChange={e => setTransferTargetId(e.target.value)} required>
+                                    <option value="">-- Select Available / Cleaning Bed --</option>
+                                    {availableForTransfer.map(b => (
+                                        <option key={b._id} value={b._id}>{b.bedNumber} — {b.ward} ({b.status})</option>
+                                    ))}
+                                </select>
+                                {availableForTransfer.length === 0 && (
+                                    <p style={{ color: '#EF4444', fontSize: '0.82rem', marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                                        <AlertTriangle size={14} /> No available beds for transfer currently.
+                                    </p>
+                                )}
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowTransferModal(false)}>Cancel</button>
+                                <button type="submit" className="btn btn-primary" disabled={saving || availableForTransfer.length === 0} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                    {saving ? 'Transferring...' : <><ArrowRightLeft size={15} /> Confirm Transfer</>}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
-      )}
-
-    </div>
-  );
+    );
 };
 
 export default BedManagementPage;
