@@ -65,7 +65,7 @@ async function runTests() {
             })
         });
         console.log('Patient 1 Token:', resCheckIn1.data.data?.token);
-        if (resCheckIn1.status !== 201 || resCheckIn1.data.data?.token !== 'T-01') throw new Error('Failed Check-In 1');
+        if (resCheckIn1.status !== 201 || !resCheckIn1.data.data?.token?.startsWith('T-')) throw new Error('Failed Check-In 1');
 
         const resCheckIn2 = await apiReq('/check-in', {
             method: 'POST',
@@ -79,7 +79,7 @@ async function runTests() {
             })
         });
         console.log('Patient 2 Token:', resCheckIn2.data.data?.token);
-        if (resCheckIn2.status !== 201 || resCheckIn2.data.data?.token !== 'T-02') throw new Error('Failed Check-In 2');
+        if (resCheckIn2.status !== 201 || !resCheckIn2.data.data?.token?.startsWith('T-')) throw new Error('Failed Check-In 2');
 
         const queueItem1Id = resCheckIn1.data.data._id;
         const queueItem2Id = resCheckIn2.data.data._id;

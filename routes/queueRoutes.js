@@ -6,9 +6,12 @@ const Appointment = require('../models/Appointment');
 const User = require('../models/User');
 const Patient = require('../models/Patient');
 
-// Helper to get formatted date YYYY-MM-DD
+// Helper to get formatted date YYYY-MM-DD in local time
 const getTodayDateString = (dateObj = new Date()) => {
-    return dateObj.toISOString().split('T')[0];
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 };
 
 // Helper to format time
@@ -171,11 +174,19 @@ router.get('/check-in/today', async (req, res) => {
     try {
         const queryDate = req.query.date || getTodayDateString();
 
-        // 1. Fetch appointments for this date
-        const appointments = await Appointment.find({ date: queryDate })
+        // 1. Fetch appointments for this date (or any confirmed/pending active appointments if none for exact date)
+        let appointments = await Appointment.find({ date: queryDate })
             .populate('user', 'name email phone')
             .populate('doctor', 'name specialization email')
             .sort({ timeSlot: 1, createdAt: 1 });
+
+        if (appointments.length === 0) {
+            appointments = await Appointment.find({ status: { $in: ['confirmed', 'pending'] } })
+                .populate('user', 'name email phone')
+                .populate('doctor', 'name specialization email')
+                .limit(10)
+                .sort({ createdAt: -1 });
+        }
 
         // 2. Fetch existing queue entries for this date
         const queueEntries = await Queue.find({ date: queryDate });

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -75,6 +75,18 @@ export const queueApi = {
   cancelQueue: (id, data) => api.post(`/queue/${id}/cancel`, data),
   getDoctorQueue: (doctorId, params) => api.get(`/queue/doctor/${doctorId}`, { params }),
   getPatientQueueHistory: (patientId) => api.get(`/queue/patient/${patientId}`),
+};
+
+// Digital Prescriptions & Rx Referrals APIs
+export const prescriptionApi = {
+  getAllPrescriptions: (params) => api.get('/prescriptions', { params }),
+  getStats: () => api.get('/prescriptions/stats'),
+  getPrescriptionById: (id) => api.get(`/prescriptions/${id}`),
+  createPrescription: (data) => api.post('/prescriptions', data),
+  updatePrescription: (id, data) => api.put(`/prescriptions/${id}`, data),
+  deletePrescription: (id) => api.delete(`/prescriptions/${id}`),
+  getPatientPrescriptions: (patientId) => api.get(`/prescriptions/patient/${patientId}`),
+  getDoctorPrescriptions: (doctorId) => api.get(`/prescriptions/doctor/${doctorId}`),
 };
 
 // Patient API endpoints

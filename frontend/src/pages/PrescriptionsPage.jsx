@@ -1,6 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Search, Plus, Trash2, X, Printer, Download, Calendar, User, PlusCircle, AlertCircle, RefreshCw } from 'lucide-react';
-import { appointmentApi, patientApi, authApi } from '../services/api';
+import {
+  FileText,
+  Search,
+  Plus,
+  Trash2,
+  X,
+  Printer,
+  Calendar,
+  User,
+  PlusCircle,
+  AlertCircle,
+  RefreshCw,
+  CheckCircle2
+} from 'lucide-react';
+import { prescriptionApi, patientApi, authApi } from '../services/api';
 
 const PrescriptionsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -9,50 +22,28 @@ const PrescriptionsPage = () => {
   const [apiLoading, setApiLoading] = useState(true);
   const [patientOptions, setPatientOptions] = useState([]);
   const [doctorOptions, setDoctorOptions] = useState([]);
+  const [prescriptions, setPrescriptions] = useState([]);
+  const [actionMessage, setActionMessage] = useState({ text: '', type: '' });
+  const [stats, setStats] = useState({
+    totalCount: 0,
+    todayCount: 0,
+    totalMedicinesCount: 0,
+    activeCount: 0
+  });
 
-  const defaultPrescriptions = [
-    {
-      id: 'RX-2026-001',
-      patientName: 'Swati Verma',
-      age: 26,
-      gender: 'Female',
-      doctorName: 'Dr. Rahul Sharma',
-      diagnosis: 'Acute Viral Fever & Sore Throat',
-      date: '2026-08-24',
-      followUp: '2026-08-31',
-      notes: 'Take complete bed rest for 3 days. Drink plenty of warm water. Avoid cold food.',
-      medicines: [
-        { name: 'Paracetamol', dosage: '500 mg', frequency: 'Three times a day (1-1-1)', duration: '5 Days', instructions: 'Post meals' },
-        { name: 'Amoxicillin', dosage: '500 mg', frequency: 'Twice a day (1-0-1)', duration: '5 Days', instructions: 'After meals' },
-        { name: 'Cough Syrup (Ascoril)', dosage: '5 ml', frequency: 'Three times a day', duration: '5 Days', instructions: 'Sip slowly' }
-      ]
-    },
-    {
-      id: 'RX-2026-002',
-      patientName: 'Karan Mehta',
-      age: 45,
-      gender: 'Male',
-      doctorName: 'Dr. Vivek Malhotra',
-      diagnosis: 'Chronic Hypertension & Dyslipidemia',
-      date: '2026-08-21',
-      followUp: '2026-09-20',
-      notes: 'Low salt, low cholesterol diet. Walk 30 minutes daily. Monitor BP twice a week.',
-      medicines: [
-        { name: 'Amlodipine', dosage: '5 mg', frequency: 'Once daily in morning (1-0-0)', duration: '30 Days', instructions: 'Empty stomach' },
-        { name: 'Atorvastatin', dosage: '10 mg', frequency: 'Once daily at night (0-0-1)', duration: '30 Days', instructions: 'Post dinner' }
-      ]
-    }
-  ];
-
-  const [prescriptions, setPrescriptions] = useState(defaultPrescriptions);
-
+  const showNotification = (text, type = 'success') => {
+    setActionMessage({ text, type });
+    setTimeout(() => setActionMessage({ text: '', type: '' }), 4000);
+  };
 
   // Form states for creating a new prescription
   const [createFormData, setCreateFormData] = useState({
     patientName: '',
+    patientId: '',
     age: '',
     gender: 'Female',
-    doctorName: 'Dr. Rahul Sharma',
+    doctorName: '',
+    doctorId: '',
     diagnosis: '',
     followUp: '',
     notes: ''
@@ -62,36 +53,40 @@ const PrescriptionsPage = () => {
     { name: '', dosage: '', frequency: '', duration: '', instructions: 'Post meals' }
   ]);
 
-  // ─── API Integration ──────────────────────────────────────────
-  const fetchPrescriptionsFromAPI = async () => {
+  // Fetch prescription list & stats
+  const fetchPrescriptions = async () => {
     setApiLoading(true);
     try {
-      const [appointmentsRes, patientsRes, doctorsRes] = await Promise.all([
-        appointmentApi.getAllAppointments({ status: 'completed' }),
+      const [listRes, statsRes, patientsRes, doctorsRes] = await Promise.allSettled([
+        prescriptionApi.getAllPrescriptions({ search: searchTerm || undefined }),
+        prescriptionApi.getStats(),
         patientApi.getAllPatients(''),
         authApi.getDoctors()
       ]);
-      const pats = patientsRes.data?.patients || [];
-      setPatientOptions(pats.map(p => p.name));
-      const docs = doctorsRes.data?.doctors || doctorsRes.data || [];
-      setDoctorOptions(docs.map(d => d.name ? 'Dr. ' + d.name : d));
-      const appts = appointmentsRes.data?.appointments || [];
-      const apiPrescriptions = appts
-        .filter(a => a.notes || a.reason)
-        .map((a, idx) => ({
-          id: 'RX-API-' + String(idx + 1).padStart(3, '0'),
-          patientName: a.user?.name || 'Patient',
-          age: 30,
-          gender: '—',
-          doctorName: a.doctorName || (a.doctor?.name ? 'Dr. ' + a.doctor.name : 'Dr. Specialist'),
-          diagnosis: a.reason || 'Routine Consultation',
-          date: a.date || new Date().toISOString().split('T')[0],
-          followUp: '—',
-          notes: a.notes || 'No additional notes.',
-          medicines: []
-        }));
-      if (apiPrescriptions.length > 0) {
-        setPrescriptions([...defaultPrescriptions, ...apiPrescriptions]);
+
+      if (listRes.status === 'fulfilled' && listRes.value?.data?.data) {
+        setPrescriptions(listRes.value.data.data);
+      }
+
+      if (statsRes.status === 'fulfilled' && statsRes.value?.data?.data) {
+        setStats(statsRes.value.data.data);
+      }
+
+      if (patientsRes.status === 'fulfilled' && patientsRes.value?.data?.patients) {
+        setPatientOptions(patientsRes.value.data.patients);
+      }
+
+      if (doctorsRes.status === 'fulfilled') {
+        const docs = doctorsRes.value?.data?.doctors || doctorsRes.value?.data || [];
+        setDoctorOptions(Array.isArray(docs) ? docs : []);
+        if (docs.length > 0 && !createFormData.doctorName) {
+          const firstDoc = docs[0];
+          setCreateFormData(prev => ({
+            ...prev,
+            doctorName: firstDoc.name ? `Dr. ${firstDoc.name}` : 'Dr. Consultant',
+            doctorId: firstDoc._id || ''
+          }));
+        }
       }
     } catch (err) {
       console.error('Prescriptions fetch error:', err);
@@ -100,21 +95,9 @@ const PrescriptionsPage = () => {
     }
   };
 
-  useEffect(() => { fetchPrescriptionsFromAPI(); }, []);
-  // ─────────────────────────────────────────────────────────────
-
-  const filteredPrescriptions = prescriptions.filter(
-    (p) =>
-      p.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.diagnosis.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Calculate Metrics
-  const totalCount = prescriptions.length;
-  const todayCount = prescriptions.filter(p => p.date === new Date().toISOString().split('T')[0]).length;
-  const totalMedicinesCount = prescriptions.reduce((sum, p) => sum + p.medicines.length, 0);
-
+  useEffect(() => {
+    fetchPrescriptions();
+  }, [searchTerm]);
 
   // Form helpers
   const handleAddMedicineRow = () => {
@@ -134,50 +117,93 @@ const PrescriptionsPage = () => {
     );
   };
 
-  const handleCreateSubmit = (e) => {
+  const handleCreateSubmit = async (e) => {
     e.preventDefault();
-    if (!createFormData.patientName || !createFormData.diagnosis) return;
+    if (!createFormData.patientName.trim() || !createFormData.diagnosis.trim()) {
+      alert('Please fill out patient name and clinical diagnosis.');
+      return;
+    }
 
     // Filter out blank medicines
-    const cleanedMedicines = formMedicines.filter(m => m.name !== '');
+    const cleanedMedicines = formMedicines.filter(m => m.name && m.name.trim() !== '');
 
-    const newPrescription = {
-      id: 'RX-2026-' + String(Date.now()).slice(-3),
-      patientName: createFormData.patientName,
-      age: parseInt(createFormData.age) || 30,
-      gender: createFormData.gender,
-      doctorName: createFormData.doctorName,
-      diagnosis: createFormData.diagnosis,
-      date: new Date().toISOString().split('T')[0],
-      followUp: createFormData.followUp || 'N/A',
-      notes: createFormData.notes || 'No notes added.',
-      medicines: cleanedMedicines
-    };
+    try {
+      const payload = {
+        patientName: createFormData.patientName.trim(),
+        patientId: createFormData.patientId || undefined,
+        age: Number(createFormData.age) || 30,
+        gender: createFormData.gender,
+        doctorName: createFormData.doctorName.trim() || 'Dr. Specialist',
+        doctorId: createFormData.doctorId || undefined,
+        diagnosis: createFormData.diagnosis.trim(),
+        medicines: cleanedMedicines,
+        followUp: createFormData.followUp || 'N/A',
+        notes: createFormData.notes || 'No additional notes.'
+      };
 
-    setPrescriptions([newPrescription, ...prescriptions]);
-    setIsCreateModalOpen(false);
-
-    // Reset forms
-    setCreateFormData({
-      patientName: '',
-      age: '',
-      gender: 'Female',
-      doctorName: 'Dr. Rahul Sharma',
-      diagnosis: '',
-      followUp: '',
-      notes: ''
-    });
-    setFormMedicines([{ name: '', dosage: '', frequency: '', duration: '', instructions: 'Post meals' }]);
+      const res = await prescriptionApi.createPrescription(payload);
+      if (res.data?.data) {
+        showNotification(`Prescription ${res.data.data.prescriptionId} generated successfully!`, 'success');
+        setIsCreateModalOpen(false);
+        // Reset form
+        setCreateFormData({
+          patientName: '',
+          patientId: '',
+          age: '',
+          gender: 'Female',
+          doctorName: doctorOptions[0]?.name ? `Dr. ${doctorOptions[0].name}` : 'Dr. Rahul Sharma',
+          doctorId: doctorOptions[0]?._id || '',
+          diagnosis: '',
+          followUp: '',
+          notes: ''
+        });
+        setFormMedicines([{ name: '', dosage: '', frequency: '', duration: '', instructions: 'Post meals' }]);
+        fetchPrescriptions();
+      }
+    } catch (err) {
+      console.error('Create prescription error:', err);
+      showNotification('Failed to generate prescription. Please try again.', 'error');
+    }
   };
 
-  const handleDeletePrescription = (id) => {
-    if (!window.confirm("Are you sure you want to delete this prescription record?")) return;
-    setPrescriptions(prev => prev.filter(p => p.id !== id));
+  const handleDeletePrescription = async (p) => {
+    const targetId = p._id || p.prescriptionId || p.id;
+    if (!window.confirm(`Are you sure you want to delete prescription ${p.prescriptionId || p.id}?`)) return;
+
+    try {
+      await prescriptionApi.deletePrescription(targetId);
+      showNotification(`Prescription deleted successfully`, 'warning');
+      setPrescriptions(prev => prev.filter(item => (item._id !== p._id && item.prescriptionId !== p.prescriptionId)));
+      fetchPrescriptions();
+    } catch (err) {
+      console.error('Delete prescription error:', err);
+      showNotification('Failed to delete prescription', 'error');
+    }
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', fontFamily: 'Inter, sans-serif' }}>
       
+      {/* Toast Notification Banner */}
+      {actionMessage.text && (
+        <div style={{
+          padding: '0.85rem 1.25rem',
+          borderRadius: '12px',
+          background: actionMessage.type === 'success' ? '#ECFDF5' : actionMessage.type === 'warning' ? '#FEF3C7' : '#FEE2E2',
+          border: `1px solid ${actionMessage.type === 'success' ? '#10B981' : actionMessage.type === 'warning' ? '#F59E0B' : '#EF4444'}`,
+          color: actionMessage.type === 'success' ? '#065F46' : actionMessage.type === 'warning' ? '#92400E' : '#991B1B',
+          fontWeight: '700',
+          fontSize: '0.86rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+        }}>
+          <CheckCircle2 size={18} />
+          <span>{actionMessage.text}</span>
+        </div>
+      )}
+
       {/* 1. Header Banner */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
@@ -187,17 +213,27 @@ const PrescriptionsPage = () => {
           <p style={{ color: '#64748B', fontSize: '0.86rem' }}>Write digital prescriptions, specify dosages, frequencies, and print verified PDF prescription slips</p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.65rem' }}>
-          <div className="header-search" style={{ width: '220px' }}>
+        <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="header-search" style={{ width: '240px' }}>
             <Search size={15} color="#64748B" />
             <input
               type="text"
-              placeholder="Search Patient ID or Diagnosis..."
+              placeholder="Search Rx ID, Patient, Diagnosis..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{ fontSize: '0.82rem' }}
             />
           </div>
+
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={fetchPrescriptions}
+            disabled={apiLoading}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+          >
+            <RefreshCw size={14} style={{ animation: apiLoading ? 'spin 1s linear infinite' : 'none' }} />
+            Refresh
+          </button>
 
           <button className="btn btn-primary btn-sm" onClick={() => setIsCreateModalOpen(true)} style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem' }}>
             <Plus size={16} /> Create Prescription
@@ -215,7 +251,7 @@ const PrescriptionsPage = () => {
           </div>
           <div>
             <div style={{ fontSize: '0.78rem', color: '#1E3A8A', fontWeight: '700' }}>TOTAL PRESCRIPTIONS</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#1E3A8A', marginTop: '0.1rem' }}>{totalCount} Issued</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#1E3A8A', marginTop: '0.1rem' }}>{stats.totalCount} Issued</div>
           </div>
         </div>
 
@@ -226,7 +262,7 @@ const PrescriptionsPage = () => {
           </div>
           <div>
             <div style={{ fontSize: '0.78rem', color: '#064E3B', fontWeight: '700' }}>ISSUED TODAY</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#064E3B', marginTop: '0.1rem' }}>{todayCount} Prescriptions</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#064E3B', marginTop: '0.1rem' }}>{stats.todayCount} Prescriptions</div>
           </div>
         </div>
 
@@ -236,8 +272,8 @@ const PrescriptionsPage = () => {
             <PlusCircle size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.78rem', color: '#4C1D95', fontWeight: '700' }}>MEDICATIONS PRESCRIBBED</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#4C1D95', marginTop: '0.1rem' }}>{totalMedicinesCount} Items</div>
+            <div style={{ fontSize: '0.78rem', color: '#4C1D95', fontWeight: '700' }}>MEDICATIONS PRESCRIBED</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: '850', color: '#4C1D95', marginTop: '0.1rem' }}>{stats.totalMedicinesCount} Items</div>
           </div>
         </div>
 
@@ -259,41 +295,51 @@ const PrescriptionsPage = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredPrescriptions.map((p) => (
-                <tr key={p.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '0.85rem', fontWeight: '800', color: '#0066FF' }}>{p.id}</td>
-                  <td style={{ padding: '0.85rem', fontWeight: '800', color: '#0F172A' }}>
-                    <div>{p.patientName}</div>
-                    <span style={{ fontSize: '0.74rem', color: '#64748B', fontWeight: '500' }}>{p.age} Yrs ({p.gender})</span>
-                  </td>
-                  <td style={{ padding: '0.85rem', color: '#475569', fontWeight: '600' }}>{p.doctorName}</td>
-                  <td style={{ padding: '0.85rem', color: '#0F172A', fontWeight: '700' }}>{p.diagnosis}</td>
-                  <td style={{ padding: '0.85rem' }}>
-                    <span style={{ background: '#EEF4FF', color: '#0066FF', padding: '0.2rem 0.6rem', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '700' }}>
-                      {p.medicines.length} Medicines
-                    </span>
-                  </td>
-                  <td style={{ padding: '0.85rem', color: '#64748B' }}>{p.date}</td>
-                  <td style={{ padding: '0.85rem', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', gap: '0.45rem', justifyContent: 'center' }}>
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        style={{ padding: '0.35rem 0.65rem', fontSize: '0.76rem', color: '#166534', borderColor: '#A7F3D0', background: '#ECFDF5', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
-                        onClick={() => setViewPrescription(p)}
-                      >
-                        <FileText size={13} /> View / Print
-                      </button>
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        style={{ padding: '0.35rem 0.65rem', fontSize: '0.76rem', color: '#DC2626', borderColor: '#FCA5A5', background: '#FEF2F2' }}
-                        onClick={() => handleDeletePrescription(p.id)}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
+              {prescriptions.length > 0 ? (
+                prescriptions.map((p) => (
+                  <tr key={p._id || p.prescriptionId || p.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                    <td style={{ padding: '0.85rem', fontWeight: '800', color: '#0066FF' }}>{p.prescriptionId || p.id}</td>
+                    <td style={{ padding: '0.85rem', fontWeight: '800', color: '#0F172A' }}>
+                      <div>{p.patientName}</div>
+                      <span style={{ fontSize: '0.74rem', color: '#64748B', fontWeight: '500' }}>
+                        {p.age ? `${p.age} Yrs` : ''} {p.gender ? `(${p.gender})` : ''}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.85rem', color: '#475569', fontWeight: '600' }}>{p.doctorName}</td>
+                    <td style={{ padding: '0.85rem', color: '#0F172A', fontWeight: '700' }}>{p.diagnosis}</td>
+                    <td style={{ padding: '0.85rem' }}>
+                      <span style={{ background: '#EEF4FF', color: '#0066FF', padding: '0.2rem 0.6rem', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '700' }}>
+                        {p.medicines ? p.medicines.length : 0} Medicines
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.85rem', color: '#64748B' }}>{p.date}</td>
+                    <td style={{ padding: '0.85rem', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: '0.45rem', justifyContent: 'center' }}>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.76rem', color: '#166534', borderColor: '#A7F3D0', background: '#ECFDF5', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                          onClick={() => setViewPrescription(p)}
+                        >
+                          <FileText size={13} /> View / Print
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.76rem', color: '#DC2626', borderColor: '#FCA5A5', background: '#FEF2F2' }}
+                          onClick={() => handleDeletePrescription(p)}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={7} style={{ padding: '2.5rem', textAlign: 'center', color: '#94A3B8' }}>
+                    {apiLoading ? 'Loading digital prescriptions...' : 'No prescriptions recorded yet. Click "Create Prescription" to issue your first Rx!'}
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
@@ -340,7 +386,7 @@ const PrescriptionsPage = () => {
                   <div style={{ marginTop: '0.25rem' }}>Age / Gender: <strong>{viewPrescription.age} Yrs / {viewPrescription.gender}</strong></div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div>PRESCRIPTION ID: <strong style={{ color: '#0066FF' }}>{viewPrescription.id}</strong></div>
+                  <div>PRESCRIPTION ID: <strong style={{ color: '#0066FF' }}>{viewPrescription.prescriptionId || viewPrescription.id}</strong></div>
                   <div style={{ marginTop: '0.25rem' }}>Date: <strong>{viewPrescription.date}</strong></div>
                 </div>
               </div>
@@ -367,17 +413,19 @@ const PrescriptionsPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {viewPrescription.medicines.map((m, idx) => (
+                  {viewPrescription.medicines && viewPrescription.medicines.map((m, idx) => (
                     <tr key={idx} style={{ borderBottom: '1px solid #F1F5F9' }}>
                       <td style={{ padding: '0.65rem 0', fontWeight: '800', color: '#334155' }}>
                         {m.name}
-                        <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: '500', marginTop: '0.15rem' }}>
-                          Instructions: <strong>{m.instructions}</strong>
-                        </div>
+                        {m.instructions && (
+                          <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: '500', marginTop: '0.15rem' }}>
+                            Instructions: <strong>{m.instructions}</strong>
+                          </div>
+                        )}
                       </td>
-                      <td style={{ padding: '0.65rem 0', textAlign: 'center', color: '#475569' }}>{m.dosage}</td>
-                      <td style={{ padding: '0.65rem 0', textAlign: 'center', color: '#475569' }}>{m.frequency}</td>
-                      <td style={{ padding: '0.65rem 0', textAlign: 'right', fontWeight: '800', color: '#0066FF' }}>{m.duration}</td>
+                      <td style={{ padding: '0.65rem 0', textAlign: 'center', color: '#475569' }}>{m.dosage || '—'}</td>
+                      <td style={{ padding: '0.65rem 0', textAlign: 'center', color: '#475569' }}>{m.frequency || '—'}</td>
+                      <td style={{ padding: '0.65rem 0', textAlign: 'right', fontWeight: '800', color: '#0066FF' }}>{m.duration || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -386,14 +434,14 @@ const PrescriptionsPage = () => {
               {/* Doctor clinical notes */}
               <div style={{ borderLeft: '3px solid #0066FF', paddingLeft: '0.75rem', background: '#F8FAFC', padding: '0.75rem', borderRadius: '0 8px 8px 0', fontSize: '0.78rem', color: '#475569', marginBottom: '2rem' }}>
                 <strong>Clinical Notes & Advice:</strong>
-                <p style={{ margin: '0.25rem 0 0 0', lineHeight: '1.4' }}>{viewPrescription.notes}</p>
+                <p style={{ margin: '0.25rem 0 0 0', lineHeight: '1.4' }}>{viewPrescription.notes || 'No specific advice noted.'}</p>
               </div>
 
               {/* Footer */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderTop: '1px solid #E2E8F0', paddingTop: '1.25rem', fontSize: '0.78rem' }}>
                 <div>
                   <div style={{ color: '#64748B' }}>Follow-up Review Date:</div>
-                  <strong style={{ color: '#0066FF', fontSize: '0.85rem' }}>{viewPrescription.followUp}</strong>
+                  <strong style={{ color: '#0066FF', fontSize: '0.85rem' }}>{viewPrescription.followUp || 'N/A'}</strong>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ borderBottom: '1px solid #94A3B8', width: '150px', height: '40px', marginBottom: '0.35rem' }} />
@@ -409,7 +457,7 @@ const PrescriptionsPage = () => {
       {/* Modal B: Create Prescription Form */}
       {isCreateModalOpen && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '600px' }}>
+          <div className="modal-content" style={{ maxWidth: '640px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.85rem', borderBottom: '1px solid #E2E8F0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                 <FileText size={22} color="#0066FF" />
@@ -432,7 +480,13 @@ const PrescriptionsPage = () => {
                     value={createFormData.patientName}
                     onChange={(e) => setCreateFormData({ ...createFormData, patientName: e.target.value })}
                     required
+                    list="patient-datalist"
                   />
+                  <datalist id="patient-datalist">
+                    {patientOptions.map(p => (
+                      <option key={p._id || p.name} value={p.name} />
+                    ))}
+                  </datalist>
                 </div>
                 <div className="form-group">
                   <label>Age</label>
@@ -458,16 +512,37 @@ const PrescriptionsPage = () => {
                 </div>
               </div>
 
-              <div className="form-group">
-                <label>Clinical Diagnosis *</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  placeholder="e.g. Acute Viral Fever, Gastric Infection..."
-                  value={createFormData.diagnosis}
-                  onChange={(e) => setCreateFormData({ ...createFormData, diagnosis: e.target.value })}
-                  required
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                <div className="form-group">
+                  <label>Doctor / Consultant *</label>
+                  <select
+                    className="input-field"
+                    value={createFormData.doctorId}
+                    onChange={(e) => {
+                      const doc = doctorOptions.find(d => d._id === e.target.value);
+                      setCreateFormData({
+                        ...createFormData,
+                        doctorId: e.target.value,
+                        doctorName: doc ? `Dr. ${doc.name}` : e.target.value
+                      });
+                    }}
+                  >
+                    {doctorOptions.map(d => (
+                      <option key={d._id} value={d._id}>Dr. {d.name} ({d.specialization || 'Consultant'})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Clinical Diagnosis *</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="e.g. Acute Viral Fever..."
+                    value={createFormData.diagnosis}
+                    onChange={(e) => setCreateFormData({ ...createFormData, diagnosis: e.target.value })}
+                    required
+                  />
+                </div>
               </div>
 
               {/* Medicines dynamic lists */}
@@ -551,7 +626,7 @@ const PrescriptionsPage = () => {
                 <button type="button" onClick={() => setIsCreateModalOpen(false)} className="btn btn-secondary">
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
+                <button type="submit" className="btn btn-primary" style={{ fontWeight: '800' }}>
                   Generate Rx Prescription
                 </button>
               </div>
