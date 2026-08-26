@@ -3,6 +3,7 @@
  */
 const authService = require('./auth-service');
 const appointmentService = require('./appointment-service');
+const queueService = require('./queue-service');
 const patientService = require('./patient-service');
 const departmentService = require('./department-service');
 const reportService = require('./report-service');
@@ -14,6 +15,7 @@ const paymentService = require('./payment-service');
 const services = [
     authService,
     appointmentService,
+    queueService,
     patientService,
     departmentService,
     reportService,

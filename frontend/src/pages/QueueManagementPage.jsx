@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ClipboardList,
   Search,
@@ -12,111 +12,283 @@ import {
   Tv,
   BellRing,
   ArrowRight,
-  ShieldCheck
+  ShieldCheck,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
+import { queueApi } from '../services/api';
+
+const defaultAppointments = [
+  { id: 'APP-501', patient: 'Aarav Gupta', doctor: 'Dr. Rahul Sharma', time: '12:30 PM', status: 'Confirmed' },
+  { id: 'APP-502', patient: 'Neha Malhotra', doctor: 'Dr. Amit Verma', time: '01:00 PM', status: 'Confirmed' },
+  { id: 'APP-503', patient: 'Vikram Singh', doctor: 'Dr. Pooja Sharma', time: '02:00 PM', status: 'Confirmed' }
+];
+
+const defaultQueue = [
+  { token: 'T-01', patient: 'Simran Kaur', doctor: 'Dr. Pooja Sharma', status: 'Completed', checkInTime: '10:15 AM' },
+  { token: 'T-02', patient: 'Rahul Sharma', doctor: 'Dr. Amit Verma', status: 'In Consultation', checkInTime: '10:45 AM' },
+  { token: 'T-03', patient: 'Priya Patel', doctor: 'Dr. Neha Singh', status: 'Waiting', checkInTime: '11:00 AM' },
+  { token: 'T-04', patient: 'Karan Mehta', doctor: 'Dr. Rahul Sharma', status: 'Waiting', checkInTime: '11:15 AM' }
+];
 
 const QueueManagementPage = () => {
-  // Mocking Today's Appointments awaiting check-in
-  const [appointments, setAppointments] = useState([
-    { id: 'APP-501', patient: 'Aarav Gupta', doctor: 'Dr. Rahul Sharma', time: '12:30 PM', status: 'Confirmed' },
-    { id: 'APP-502', patient: 'Neha Malhotra', doctor: 'Dr. Amit Verma', time: '01:00 PM', status: 'Confirmed' },
-    { id: 'APP-503', patient: 'Vikram Singh', doctor: 'Dr. Pooja Sharma', time: '02:00 PM', status: 'Confirmed' }
-  ]);
-
-  // Daily Live Queue list
-  const [queue, setQueue] = useState([
-    { token: 'T-01', patient: 'Simran Kaur', doctor: 'Dr. Pooja Sharma', status: 'Completed', checkInTime: '10:15 AM' },
-    { token: 'T-02', patient: 'Rahul Sharma', doctor: 'Dr. Amit Verma', status: 'In Consultation', checkInTime: '10:45 AM' },
-    { token: 'T-03', patient: 'Priya Patel', doctor: 'Dr. Neha Singh', status: 'Waiting', checkInTime: '11:00 AM' },
-    { token: 'T-04', patient: 'Karan Mehta', doctor: 'Dr. Rahul Sharma', status: 'Waiting', checkInTime: '11:15 AM' }
-  ]);
-
-  // Tracking sequential token counter
+  const [appointments, setAppointments] = useState(defaultAppointments);
+  const [queue, setQueue] = useState(defaultQueue);
   const [tokenCounter, setTokenCounter] = useState(5);
-
-  // States
-  const [currentCall, setCurrentCall] = useState({
-    token: 'T-02',
-    patient: 'Rahul Sharma',
-    doctor: 'Dr. Amit Verma',
-    status: 'In Consultation'
+  const [currentCall, setCurrentCall] = useState(defaultQueue[1]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalQueue: 4,
+    inConsultation: 1,
+    waiting: 2,
+    completed: 1
   });
+  const refreshIntervalRef = useRef(null);
 
-  // Calculate Metrics
-  const totalQueue = queue.length;
-  const inConsultationCount = queue.filter(q => q.status === 'In Consultation').length;
-  const waitingCount = queue.filter(q => q.status === 'Waiting').length;
-  const completedCount = queue.filter(q => q.status === 'Completed').length;
+  // Calculate Metrics with state fallback
+  const totalQueue = stats.totalQueue !== undefined ? stats.totalQueue : queue.length;
+  const inConsultationCount = stats.inConsultation !== undefined ? stats.inConsultation : queue.filter(q => q.status === 'In Consultation').length;
+  const waitingCount = stats.waiting !== undefined ? stats.waiting : queue.filter(q => q.status === 'Waiting').length;
+  const completedCount = stats.completed !== undefined ? stats.completed : queue.filter(q => q.status === 'Completed').length;
+
+  const fetchQueueData = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Fetch stats, waiting board, and check-in appointments in parallel
+      const [statsRes, boardRes, checkInRes, currentRes] = await Promise.allSettled([
+        queueApi.getTodayStats({ date: today }),
+        queueApi.getWaitingBoard({ date: today }),
+        queueApi.getTodayCheckInList({ date: today }),
+        queueApi.getCurrentConsultation({ date: today })
+      ]);
+
+      // Handle stats
+      if (statsRes.status === 'fulfilled' && statsRes.value?.data?.data) {
+        setStats(statsRes.value.data.data);
+      }
+
+      // Handle waiting board
+      if (boardRes.status === 'fulfilled' && boardRes.value?.data?.data?.length > 0) {
+        const liveQueue = boardRes.value.data.data.map(item => ({
+          _id: item._id,
+          token: item.token,
+          patient: item.patient || item.patientName,
+          doctor: item.doctor || item.doctorName,
+          status: item.status,
+          checkInTime: item.checkInTime || new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+        }));
+        setQueue(liveQueue);
+        setTokenCounter(liveQueue.length + 1);
+      }
+
+      // Handle active consultation
+      if (currentRes.status === 'fulfilled' && currentRes.value?.data?.data) {
+        const active = currentRes.value.data.data;
+        setCurrentCall({
+          _id: active._id,
+          token: active.token,
+          patient: active.patientName || active.patient,
+          doctor: active.doctorName || active.doctor,
+          status: active.status,
+          checkInTime: active.checkInTime
+        });
+      } else if (boardRes.status === 'fulfilled' && boardRes.value?.data?.data?.length > 0) {
+        const activeInBoard = boardRes.value.data.data.find(q => q.status === 'In Consultation');
+        if (activeInBoard) {
+          setCurrentCall({
+            _id: activeInBoard._id,
+            token: activeInBoard.token,
+            patient: activeInBoard.patient || activeInBoard.patientName,
+            doctor: activeInBoard.doctor || activeInBoard.doctorName,
+            status: activeInBoard.status,
+            checkInTime: activeInBoard.checkInTime
+          });
+        }
+      }
+
+      // Handle check-in appointments list
+      if (checkInRes.status === 'fulfilled' && checkInRes.value?.data?.data?.length > 0) {
+        const pendingCheckIns = checkInRes.value.data.data
+          .filter(a => !a.isCheckedIn)
+          .map(a => ({
+            id: a.id || a.appointmentId,
+            patient: a.patient,
+            doctor: a.doctor,
+            time: a.time || '—',
+            status: a.status || 'Confirmed'
+          }));
+        if (pendingCheckIns.length > 0) {
+          setAppointments(pendingCheckIns);
+        }
+      }
+    } catch (err) {
+      console.error('Queue fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchQueueData();
+    refreshIntervalRef.current = setInterval(fetchQueueData, 15000);
+    return () => clearInterval(refreshIntervalRef.current);
+  }, []);
 
   // Receptionist utility: Check-in patient and generate token
-  const handleCheckIn = (app) => {
-    const formattedToken = 'T-' + String(tokenCounter).padStart(2, '0');
-    
-    // Add to queue
-    const newQueueItem = {
-      token: formattedToken,
-      patient: app.patient,
-      doctor: app.doctor,
-      status: 'Waiting',
-      checkInTime: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-    };
-
-    setQueue([...queue, newQueueItem]);
-    setTokenCounter(tokenCounter + 1);
-
-    // Remove from checked-in appointments list
-    setAppointments(prev => prev.filter(item => item.id !== app.id));
-
-    // Play beep/sound notifications
+  const handleCheckIn = async (app) => {
     try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      osc.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(0.15);
-    } catch (e) {}
+      const today = new Date().toISOString().split('T')[0];
+      const isCustomApp = app.id && !String(app.id).startsWith('APP-');
+
+      let responseToken = null;
+      let newQueueEntry = null;
+
+      if (isCustomApp) {
+        const res = await queueApi.checkIn({
+          appointmentId: app.id,
+          date: today
+        });
+        if (res.data?.data) {
+          newQueueEntry = res.data.data;
+          responseToken = res.data.data.token;
+        }
+      } else {
+        // Mock / Walk-in check-in fallback
+        const res = await queueApi.checkIn({
+          patientName: app.patient,
+          doctorName: app.doctor,
+          timeSlot: app.time,
+          date: today
+        });
+        if (res.data?.data) {
+          newQueueEntry = res.data.data;
+          responseToken = res.data.data.token;
+        }
+      }
+
+      const formattedToken = responseToken || ('T-' + String(tokenCounter).padStart(2, '0'));
+      
+      const newQueueItem = newQueueEntry ? {
+        _id: newQueueEntry._id,
+        token: newQueueEntry.token,
+        patient: newQueueEntry.patientName || app.patient,
+        doctor: newQueueEntry.doctorName || app.doctor,
+        status: newQueueEntry.status || 'Waiting',
+        checkInTime: newQueueEntry.checkInTime || new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+      } : {
+        token: formattedToken,
+        patient: app.patient,
+        doctor: app.doctor,
+        status: 'Waiting',
+        checkInTime: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+      };
+
+      setQueue(prev => [...prev, newQueueItem]);
+      setTokenCounter(prev => prev + 1);
+      setAppointments(prev => prev.filter(item => item.id !== app.id));
+      setStats(prev => ({
+        ...prev,
+        totalQueue: (prev.totalQueue || 0) + 1,
+        waiting: (prev.waiting || 0) + 1
+      }));
+
+      // Audio notification
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        osc.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(0.15);
+      } catch (e) {}
+    } catch (err) {
+      console.error('Check-in error:', err);
+    }
   };
 
   // Doctor calling console: Call next patient
-  const handleCallNext = () => {
-    const nextPatient = queue.find(q => q.status === 'Waiting');
-    if (!nextPatient) {
-      alert("No patients currently waiting in the queue!");
-      return;
-    }
+  const handleCallNext = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const res = await queueApi.callNext({ date: today });
+      
+      if (res.data?.data) {
+        const called = res.data.data;
+        const mappedCalled = {
+          _id: called._id,
+          token: called.token,
+          patient: called.patientName || called.patient,
+          doctor: called.doctorName || called.doctor,
+          status: 'In Consultation',
+          checkInTime: called.checkInTime
+        };
 
-    // Set previously active patient to Completed
-    if (currentCall) {
+        setQueue(prev =>
+          prev.map(q => {
+            if (currentCall && (q._id === currentCall._id || q.token === currentCall.token)) {
+              return { ...q, status: 'Completed' };
+            }
+            if (q._id === called._id || q.token === called.token) {
+              return { ...q, status: 'In Consultation' };
+            }
+            return q;
+          })
+        );
+        setCurrentCall(mappedCalled);
+        fetchQueueData();
+        return;
+      }
+    } catch (apiErr) {
+      // Local fallback if API reports 404 / no waiting
+      const nextPatient = queue.find(q => q.status === 'Waiting');
+      if (!nextPatient) {
+        alert("No patients currently waiting in the queue!");
+        return;
+      }
+
+      if (currentCall) {
+        setQueue(prev =>
+          prev.map(q => q.token === currentCall.token ? { ...q, status: 'Completed' } : q)
+        );
+      }
+
       setQueue(prev =>
-        prev.map(q => q.token === currentCall.token ? { ...q, status: 'Completed' } : q)
+        prev.map(q => q.token === nextPatient.token ? { ...q, status: 'In Consultation' } : q)
       );
+      setCurrentCall({ ...nextPatient, status: 'In Consultation' });
     }
-
-    // Call new patient
-    setQueue(prev =>
-      prev.map(q => q.token === nextPatient.token ? { ...q, status: 'In Consultation' } : q)
-    );
-
-    setCurrentCall({
-      ...nextPatient,
-      status: 'In Consultation'
-    });
   };
 
-  const handleStartConsultation = () => {
+  const handleStartConsultation = async () => {
     if (!currentCall) return;
+    try {
+      if (currentCall._id || currentCall.token) {
+        await queueApi.startConsultation(currentCall._id || currentCall.token);
+      }
+    } catch (e) {
+      console.error('Start consultation error:', e);
+    }
     setQueue(prev =>
-      prev.map(q => q.token === currentCall.token ? { ...q, status: 'In Consultation' } : q)
+      prev.map(q => (q._id === currentCall._id || q.token === currentCall.token) ? { ...q, status: 'In Consultation' } : q)
     );
     setCurrentCall(prev => ({ ...prev, status: 'In Consultation' }));
+    fetchQueueData();
   };
 
-  const handleCompleteConsultation = () => {
+  const handleCompleteConsultation = async () => {
     if (!currentCall) return;
+    try {
+      if (currentCall._id || currentCall.token) {
+        await queueApi.completeConsultation(currentCall._id || currentCall.token);
+      }
+    } catch (e) {
+      console.error('Complete consultation error:', e);
+    }
     setQueue(prev =>
-      prev.map(q => q.token === currentCall.token ? { ...q, status: 'Completed' } : q)
+      prev.map(q => (q._id === currentCall._id || q.token === currentCall.token) ? { ...q, status: 'Completed' } : q)
     );
     setCurrentCall(null);
+    fetchQueueData();
   };
 
   return (
@@ -132,6 +304,15 @@ const QueueManagementPage = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '0.65rem' }}>
+          <button
+            className="btn btn-secondary btn-sm"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+            onClick={fetchQueueData}
+            disabled={loading}
+          >
+            <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+            Refresh
+          </button>
           <div style={{ background: '#0F172A', color: '#FFFFFF', padding: '0.5rem 1rem', borderRadius: '10px', fontSize: '0.82rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
             <Tv size={16} color="#10B981" />
             <span>Waiting Room TV Board Active</span>

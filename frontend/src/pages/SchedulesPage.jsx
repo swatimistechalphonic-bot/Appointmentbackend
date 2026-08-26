@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { appointmentApi, authApi } from '../services/api';
 import {
   Clock,
   Calendar as CalendarIcon,
@@ -23,6 +24,10 @@ import {
 } from 'lucide-react';
 
 const SchedulesPage = () => {
+  const [apiLoading, setApiLoading] = useState(false);
+  const [apiError, setApiError] = useState('');
+  const [doctorsList, setDoctorsList] = useState([]);
+
   // Tabs: 'schedules', 'calendar', 'leaves', 'holidays', 'slots'
   const [activeTab, setActiveTab] = useState('schedules');
   const [searchTerm, setSearchTerm] = useState('');
@@ -158,6 +163,51 @@ const SchedulesPage = () => {
     }
   ]);
 
+  // Fetch doctors from API and load their schedules
+  const fetchDoctorSchedules = async () => {
+    setApiLoading(true);
+    setApiError('');
+    try {
+      const doctorsRes = await authApi.getDoctors();
+      const doctors = doctorsRes.data?.doctors || doctorsRes.data || [];
+      if (doctors.length > 0) {
+        setDoctorsList(doctors);
+        // Fetch each doctor's schedule and merge
+        const schedulePromises = doctors.slice(0, 10).map(d =>
+          appointmentApi.getDoctorSchedule(d._id).catch(() => null)
+        );
+        const scheduleResults = await Promise.all(schedulePromises);
+        const apiSchedules = doctors.slice(0, 10).map((d, idx) => {
+          const sch = scheduleResults[idx]?.data?.schedule;
+          if (!sch) return null;
+          return {
+            id: d._id,
+            doctorName: sch.doctorName || d.name || 'Dr. Specialist',
+            specialization: d.specialization || 'General Physician',
+            workingDays: Array.isArray(sch.workingDays)
+              ? sch.workingDays.slice(0, 2).join(' - ')
+              : 'Mon - Sat',
+            startTime: sch.shiftStartTime || '09:00 AM',
+            endTime: sch.shiftEndTime || '05:00 PM',
+            slotDuration: `${sch.slotDurationMinutes || 30} Mins`,
+            totalSlots: Math.floor(8 * 60 / (sch.slotDurationMinutes || 30)),
+            status: sch.status === 'active' ? 'Active' : 'Inactive'
+          };
+        }).filter(Boolean);
+        if (apiSchedules.length > 0) setSchedules(apiSchedules);
+      }
+    } catch (err) {
+      console.error('Schedule fetch error:', err);
+      setApiError('Could not load live schedule data. Showing demo records.');
+    } finally {
+      setApiLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDoctorSchedules();
+  }, []);
+
   // Form states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editSchedule, setEditSchedule] = useState(null);
@@ -223,7 +273,7 @@ const SchedulesPage = () => {
     .reduce((sum, s) => sum + s.totalSlots, 0);
 
   // Handlers
-  const handleAddSubmit = (e) => {
+  const handleAddSubmit = async (e) => {
     e.preventDefault();
     if (!addFormData.doctorName) return;
     const newEntry = {
@@ -232,6 +282,26 @@ const SchedulesPage = () => {
     };
     setSchedules([newEntry, ...schedules]);
     setIsAddModalOpen(false);
+
+    // Attempt to persist via API
+    try {
+      const slotDurMin = parseInt(addFormData.slotDuration) || 30;
+      const doctor = doctorsList.find(d =>
+        d.name?.toLowerCase().includes(addFormData.doctorName.toLowerCase().replace('Dr. ', ''))
+      );
+      await appointmentApi.saveDoctorSchedule({
+        doctor: doctor?._id || addFormData.doctorName,
+        doctorName: addFormData.doctorName,
+        workingDays: addFormData.workingDays.split(' - '),
+        shiftStartTime: addFormData.startTime,
+        shiftEndTime: addFormData.endTime,
+        slotDurationMinutes: slotDurMin,
+        status: addFormData.status === 'Active' ? 'active' : 'inactive'
+      });
+    } catch (err) {
+      console.error('Save schedule API error:', err);
+    }
+
     setAddFormData({
       doctorName: '',
       specialization: 'General Physician',
@@ -249,12 +319,28 @@ const SchedulesPage = () => {
     setEditFormData({ ...sch });
   };
 
-  const handleEditSubmit = (e) => {
+  const handleEditSubmit = async (e) => {
     e.preventDefault();
     setSchedules((prev) =>
       prev.map((s) => (s.id === editSchedule.id ? { ...editFormData } : s))
     );
     setEditSchedule(null);
+
+    // Attempt to persist edit via API
+    try {
+      const slotDurMin = parseInt(editFormData.slotDuration) || 30;
+      await appointmentApi.saveDoctorSchedule({
+        doctor: editSchedule.id,
+        doctorName: editFormData.doctorName,
+        workingDays: editFormData.workingDays ? editFormData.workingDays.split(' - ') : ['Monday', 'Saturday'],
+        shiftStartTime: editFormData.startTime,
+        shiftEndTime: editFormData.endTime,
+        slotDurationMinutes: slotDurMin,
+        status: editFormData.status === 'Active' ? 'active' : 'inactive'
+      });
+    } catch (err) {
+      console.error('Update schedule API error:', err);
+    }
   };
 
   const handleDeleteSchedule = (id, name) => {

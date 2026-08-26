@@ -54,10 +54,27 @@ export const appointmentApi = {
   // Doctor Schedules & Shift Timings APIs
   getDoctorSchedule: (doctorId) => api.get(`/appointments/doctor-schedules/${doctorId}`),
   saveDoctorSchedule: (data) => api.post('/appointments/doctor-schedules', data),
-  // OPD Live Queue Flow APIs
-  getLiveQueue: (params) => api.get('/appointments/queue/live', { params }),
-  checkInPatient: (appointmentId) => api.post('/appointments/queue/check-in', { appointmentId }),
-  updateQueueStatus: (appointmentId, data) => api.put(`/appointments/queue/${appointmentId}/status`, data),
+  // OPD Live Queue Flow APIs (legacy alias)
+  getLiveQueue: (params) => api.get('/queue/today/board', { params }),
+  checkInPatient: (appointmentId) => api.post('/queue/check-in', { appointmentId }),
+  updateQueueStatus: (id, data) => api.post(`/queue/${id}/${data.status === 'completed' ? 'complete' : data.status === 'in-consultation' ? 'start' : 'start'}`),
+};
+
+// Queue Management & Live Token Console APIs
+export const queueApi = {
+  getTodayStats: (params) => api.get('/queue/today', { params }),
+  getTodayCheckInList: (params) => api.get('/queue/check-in/today', { params }),
+  checkIn: (data) => api.post('/queue/check-in', data),
+  getWaitingBoard: (params) => api.get('/queue/today/board', { params }),
+  getCurrentConsultation: (params) => api.get('/queue/current', { params }),
+  callNext: (data) => api.post('/queue/call-next', data),
+  startConsultation: (id, data) => api.post(`/queue/${id}/start`, data),
+  completeConsultation: (id, data) => api.post(`/queue/${id}/complete`, data),
+  skipPatient: (id, data) => api.post(`/queue/${id}/skip`, data),
+  recallPatient: (id, data) => api.post(`/queue/${id}/recall`, data),
+  cancelQueue: (id, data) => api.post(`/queue/${id}/cancel`, data),
+  getDoctorQueue: (doctorId, params) => api.get(`/queue/doctor/${doctorId}`, { params }),
+  getPatientQueueHistory: (patientId) => api.get(`/queue/patient/${patientId}`),
 };
 
 // Patient API endpoints

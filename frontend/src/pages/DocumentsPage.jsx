@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { patientApi } from '../services/api';
 import {
   FileText,
   Search,
@@ -83,6 +84,7 @@ const DocumentsPage = () => {
     const saved = localStorage.getItem('caresync_documents_list');
     return saved ? JSON.parse(saved) : initialDocuments;
   });
+  const [patientOptions, setPatientOptions] = useState([]);
 
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [previewDoc, setPreviewDoc] = useState(null);
@@ -94,6 +96,20 @@ const DocumentsPage = () => {
     fileType: 'PDF',
     notes: ''
   });
+
+  // Fetch real patients for owner dropdown
+  useEffect(() => {
+    const fetchPatients = async () => {
+      try {
+        const res = await patientApi.getAllPatients('');
+        const pats = res.data?.patients || [];
+        if (pats.length > 0) setPatientOptions(pats.map(p => p.name));
+      } catch (err) {
+        console.error('Documents patient fetch error:', err);
+      }
+    };
+    fetchPatients();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('caresync_documents_list', JSON.stringify(documents));

@@ -6,6 +6,7 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const connectDB = require('./db');
 const userRoutes = require('./routes/userRoutes');
 const appointmentRoutes = require('./routes/appointmentRoutes');
+const queueRoutes = require('./routes/queueRoutes');
 const patientRoutes = require('./routes/patientRoutes');
 const { registerMicroservices } = require('./microservices/gateway');
 
@@ -71,6 +72,7 @@ registerMicroservices(app);
 // Core Route Mounts (Fallback & Direct Resolution)
 app.use('/api/users', userRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/queue', queueRoutes);
 app.use('/api/patients', patientRoutes);
 
 // Default Route

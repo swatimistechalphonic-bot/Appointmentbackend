@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FolderHeart,
   Search,
@@ -12,102 +12,175 @@ import {
   CalendarRange,
   Dna,
   ShieldAlert,
-  Printer
+  Printer,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
+import { patientApi, appointmentApi } from '../services/api';
+
+const defaultPatientsEHR = [
+  {
+    id: 'P-101',
+    name: 'Swati Verma',
+    age: 26,
+    gender: 'Female',
+    bloodGroup: 'B+',
+    phone: '+91 9876543210',
+    email: 'swati@example.com',
+    address: 'Sector 62, Noida, UP, India',
+    allergies: 'Penicillin, Dust Mites',
+    medicalHistory: 'Mild Seasonal Asthma',
+    currentMedications: 'Montelukast 10mg (once daily)',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
+    visits: [
+      {
+        date: '2026-08-24',
+        doctorName: 'Dr. Rahul Sharma',
+        specialty: 'General Physician',
+        diagnosis: 'Acute Viral Fever & Throat Infection',
+        vitals: { bp: '118/76', temp: '101.4 °F', hr: '82 bpm' },
+        notes: 'Patient presented with high fever, sore throat, and body ache for 2 days. Rest advised. Increase fluid intake.',
+        prescription: {
+          medicines: [
+            { name: 'Paracetamol', dosage: '500 mg', frequency: 'Three times a day (1-1-1)', duration: '5 Days', instructions: 'Post meals' },
+            { name: 'Amoxicillin', dosage: '500 mg', frequency: 'Twice a day (1-0-1)', duration: '5 Days', instructions: 'After meals' },
+            { name: 'Cough Syrup (Ascoril)', dosage: '5 ml', frequency: 'Three times a day', duration: '5 Days', instructions: 'Sip slowly' }
+          ]
+        },
+        labs: ['Complete Blood Count (CBC)']
+      }
+    ]
+  },
+  {
+    id: 'P-102',
+    name: 'Karan Mehta',
+    age: 45,
+    gender: 'Male',
+    bloodGroup: 'O+',
+    phone: '+91 9900112233',
+    email: 'karan@example.com',
+    address: 'Connaught Place, New Delhi, India',
+    allergies: 'None reported',
+    medicalHistory: 'Hypertension, Dyslipidemia',
+    currentMedications: 'Amlodipine 5mg (once daily), Atorvastatin 10mg (once daily at night)',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
+    visits: [
+      {
+        date: '2026-08-21',
+        doctorName: 'Dr. Vivek Malhotra',
+        specialty: 'Cardiology Specialist',
+        diagnosis: 'Hypertension Follow-up & Dyslipidemia',
+        vitals: { bp: '135/88', temp: '98.6 °F', hr: '68 bpm' },
+        notes: 'Blood pressure is under moderate control. Triglycerides are slightly elevated. Dietary counselling given.',
+        prescription: {
+          medicines: [
+            { name: 'Amlodipine', dosage: '5 mg', frequency: 'Once daily in morning (1-0-0)', duration: '30 Days', instructions: 'Empty stomach' },
+            { name: 'Atorvastatin', dosage: '10 mg', frequency: 'Once daily at night (0-0-1)', duration: '30 Days', instructions: 'Post dinner' }
+          ]
+        },
+        labs: ['Lipid Profile', 'Serum Creatinine']
+      }
+    ]
+  }
+];
+
+// Convert a DB patient + their appointments into EHR format
+const buildEHRFromAPI = (patient, appointments) => {
+  const visits = appointments
+    .filter(a => a.user?._id === patient._id || a.user === patient._id)
+    .map(a => ({
+      date: a.date,
+      doctorName: a.doctorName || (a.doctor?.name ? `Dr. ${a.doctor.name}` : 'Dr. Specialist'),
+      specialty: a.specialization || 'General',
+      diagnosis: a.reason || 'Routine Consultation',
+      vitals: { bp: '—', temp: '—', hr: '—' },
+      notes: a.notes || 'No detailed notes recorded for this visit.',
+      prescription: { medicines: [] },
+      labs: []
+    }))
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  return {
+    id: patient._id,
+    name: patient.name,
+    age: patient.age || '—',
+    gender: patient.gender || '—',
+    bloodGroup: patient.bloodGroup || '—',
+    phone: patient.phone || '—',
+    email: patient.email || '—',
+    address: patient.address || '—',
+    allergies: patient.medicalHistory?.includes('allerg') ? patient.medicalHistory : 'None reported',
+    medicalHistory: patient.medicalHistory || 'No chronic conditions recorded',
+    currentMedications: patient.currentMedications || 'None',
+    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(patient.name)}&background=EEF4FF&color=0066FF&size=100`,
+    visits: visits.length > 0 ? visits : [{
+      date: new Date().toISOString().split('T')[0],
+      doctorName: 'Dr. Rahul Sharma',
+      specialty: 'General Physician',
+      diagnosis: 'Initial Registration',
+      vitals: { bp: '—', temp: '—', hr: '—' },
+      notes: 'No visit history yet. Patient registered in the system.',
+      prescription: { medicines: [] },
+      labs: []
+    }]
+  };
+};
 
 const MedicalRecordsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPatientId, setSelectedPatientId] = useState(null);
+  const [patientsEHR, setPatientsEHR] = useState(defaultPatientsEHR);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Master Electronic Health Records (EHR) database
-  const [patientsEHR, setPatientsEHR] = useState([
-    {
-      id: 'P-101',
-      name: 'Swati Verma',
-      age: 26,
-      gender: 'Female',
-      bloodGroup: 'B+',
-      phone: '+91 9876543210',
-      email: 'swati@example.com',
-      address: 'Sector 62, Noida, UP, India',
-      allergies: 'Penicillin, Dust Mites',
-      medicalHistory: 'Mild Seasonal Asthma',
-      currentMedications: 'Montelukast 10mg (once daily)',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
-      visits: [
-        {
-          date: '2026-08-24',
-          doctorName: 'Dr. Rahul Sharma',
-          specialty: 'General Physician',
-          diagnosis: 'Acute Viral Fever & Throat Infection',
-          vitals: { bp: '118/76', temp: '101.4 °F', hr: '82 bpm' },
-          notes: 'Patient presented with high fever, sore throat, and body ache for 2 days. Rest advised. Increase fluid intake.',
-          prescription: {
-            medicines: [
-              { name: 'Paracetamol', dosage: '500 mg', frequency: 'Three times a day (1-1-1)', duration: '5 Days', instructions: 'Post meals' },
-              { name: 'Amoxicillin', dosage: '500 mg', frequency: 'Twice a day (1-0-1)', duration: '5 Days', instructions: 'After meals' },
-              { name: 'Cough Syrup (Ascoril)', dosage: '5 ml', frequency: 'Three times a day', duration: '5 Days', instructions: 'Sip slowly' }
-            ]
-          },
-          labs: ['Complete Blood Count (CBC)']
-        },
-        {
-          date: '2026-06-12',
-          doctorName: 'Dr. Neha Singh',
-          specialty: 'Dermatologist',
-          diagnosis: 'Contact Dermatitis (Allergic Skin Rash)',
-          vitals: { bp: '115/72', temp: '98.4 °F', hr: '74 bpm' },
-          notes: 'Rashes noticed on left forearm, likely due to soap detergent allergy. Avoid contact, use hypoallergenic soap.',
-          prescription: {
-            medicines: [
-              { name: 'Cetirizine', dosage: '10 mg', frequency: 'Once daily at night (0-0-1)', duration: '10 Days', instructions: 'Before sleep' },
-              { name: 'Hydrocortisone Cream', dosage: '1% w/w', frequency: 'Apply twice daily', duration: '7 Days', instructions: 'External use only' }
-            ]
-          },
-          labs: []
-        }
-      ]
-    },
-    {
-      id: 'P-102',
-      name: 'Karan Mehta',
-      age: 45,
-      gender: 'Male',
-      bloodGroup: 'O+',
-      phone: '+91 9900112233',
-      email: 'karan@example.com',
-      address: 'Connaught Place, New Delhi, India',
-      allergies: 'None reported',
-      medicalHistory: 'Hypertension, Dyslipidemia',
-      currentMedications: 'Amlodipine 5mg (once daily), Atorvastatin 10mg (once daily at night)',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-      visits: [
-        {
-          date: '2026-08-21',
-          doctorName: 'Dr. Vivek Malhotra',
-          specialty: 'Cardiology Specialist',
-          diagnosis: 'Hypertension Follow-up & Dyslipidemia',
-          vitals: { bp: '135/88', temp: '98.6 °F', hr: '68 bpm' },
-          notes: 'Blood pressure is under moderate control. Triglycerides are slightly elevated. Dietary counselling given (low sodium, low fat).',
-          prescription: {
-            medicines: [
-              { name: 'Amlodipine', dosage: '5 mg', frequency: 'Once daily in morning (1-0-0)', duration: '30 Days', instructions: 'Empty stomach' },
-              { name: 'Atorvastatin', dosage: '10 mg', frequency: 'Once daily at night (0-0-1)', duration: '30 Days', instructions: 'Post dinner' }
-            ]
-          },
-          labs: ['Lipid Profile', 'Serum Creatinine']
-        }
-      ]
+  const fetchEHRData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      // Fetch patients and all appointments in parallel
+      const [patientsRes, appointmentsRes] = await Promise.all([
+        patientApi.getAllPatients(''),
+        appointmentApi.getAllAppointments({})
+      ]);
+
+      const patients = patientsRes.data?.patients || [];
+      const appointments = appointmentsRes.data?.appointments || [];
+
+      if (patients.length > 0) {
+        const ehrList = patients.map(p => buildEHRFromAPI(p, appointments));
+        setPatientsEHR(ehrList);
+      } else {
+        setPatientsEHR(defaultPatientsEHR);
+      }
+    } catch (err) {
+      console.error('EHR Fetch Error:', err);
+      // Silently fall back to default data
+      setPatientsEHR(defaultPatientsEHR);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchEHRData();
+  }, []);
 
   const filteredPatients = patientsEHR.filter(
     (p) =>
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.id.toLowerCase().includes(searchTerm.toLowerCase())
+      String(p.id).toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const selectedPatient = patientsEHR.find(p => p.id === selectedPatientId);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '350px', gap: '1rem' }}>
+        <RefreshCw size={32} color="#0066FF" style={{ animation: 'spin 1s linear infinite' }} />
+        <p style={{ color: '#64748B', fontWeight: '600' }}>Loading Electronic Health Records…</p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', fontFamily: 'Inter, sans-serif' }}>
@@ -122,15 +195,24 @@ const MedicalRecordsPage = () => {
             <p style={{ color: '#64748B', fontSize: '0.86rem' }}>Access patient diagnoses, timelines of previous visits, vitals charts, lab reports, and prescriptions</p>
           </div>
 
-          <div className="header-search" style={{ width: '300px' }}>
-            <Search size={15} color="#64748B" />
-            <input
-              type="text"
-              placeholder="Search Patient ID or Name..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ fontSize: '0.82rem' }}
-            />
+          <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+              onClick={fetchEHRData}
+            >
+              <RefreshCw size={14} /> Refresh
+            </button>
+            <div className="header-search" style={{ width: '300px' }}>
+              <Search size={15} color="#64748B" />
+              <input
+                type="text"
+                placeholder="Search Patient ID or Name..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ fontSize: '0.82rem' }}
+              />
+            </div>
           </div>
         </div>
       ) : (
@@ -151,49 +233,64 @@ const MedicalRecordsPage = () => {
         </div>
       )}
 
+      {/* Error Banner */}
+      {error && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', padding: '0.75rem 1rem', color: '#991B1B', fontSize: '0.82rem' }}>
+          <AlertCircle size={16} />
+          <span>{error}</span>
+        </div>
+      )}
+
       {/* 2. Main content area rendering */}
       {!selectedPatient ? (
         // List View of Patients EMR
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.25rem' }}>
-          {filteredPatients.map((p) => (
-            <div key={p.id} className="card" style={{ padding: '1.25rem', border: '1px solid #E2E8F0', borderRadius: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.15rem' }}>
-                  <img
-                    src={p.avatar}
-                    alt={p.name}
-                    style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }}
-                  />
-                  <div>
-                    <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#0F172A', margin: 0 }}>{p.name}</h3>
-                    <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: '0.1rem' }}>
-                      ID: <strong>{p.id}</strong> | Blood Group: <strong style={{ color: '#DC2626' }}>{p.bloodGroup}</strong>
+          {filteredPatients.length === 0 ? (
+            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '3rem', color: '#94A3B8', fontSize: '0.86rem' }}>
+              No patient records found matching your search.
+            </div>
+          ) : (
+            filteredPatients.map((p) => (
+              <div key={p.id} className="card" style={{ padding: '1.25rem', border: '1px solid #E2E8F0', borderRadius: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.15rem' }}>
+                    <img
+                      src={p.avatar}
+                      alt={p.name}
+                      style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }}
+                      onError={e => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=EEF4FF&color=0066FF&size=100`; }}
+                    />
+                    <div>
+                      <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#0F172A', margin: 0 }}>{p.name}</h3>
+                      <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: '0.1rem' }}>
+                        ID: <strong>{String(p.id).slice(0, 12)}</strong> | Blood Group: <strong style={{ color: '#DC2626' }}>{p.bloodGroup}</strong>
+                      </div>
                     </div>
+                  </div>
+
+                  <div style={{ fontSize: '0.82rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.85rem', background: '#F8FAFC', borderRadius: '12px', marginBottom: '1.15rem' }}>
+                    <div>📞 Contact: <strong>{p.phone}</strong></div>
+                    <div style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>📧 Email: <strong>{p.email}</strong></div>
+                    <div>⚠️ Allergies: <strong style={{ color: p.allergies === 'None reported' ? '#166534' : '#DC2626' }}>{p.allergies}</strong></div>
                   </div>
                 </div>
 
-                <div style={{ fontSize: '0.82rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.85rem', background: '#F8FAFC', borderRadius: '12px', marginBottom: '1.15rem' }}>
-                  <div>📞 Contact: <strong>{p.phone}</strong></div>
-                  <div style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>📧 Email: <strong>{p.email}</strong></div>
-                  <div>⚠️ Allergies: <strong style={{ color: p.allergies === 'None reported' ? '#166534' : '#DC2626' }}>{p.allergies}</strong></div>
+                <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.78rem', color: '#94A3B8', fontWeight: '600' }}>
+                    Visits Logged: {p.visits.length}
+                  </span>
+
+                  <button
+                    className="btn btn-primary btn-sm"
+                    style={{ padding: '0.4rem 0.85rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                    onClick={() => setSelectedPatientId(p.id)}
+                  >
+                    <Eye size={14} /> Open Records
+                  </button>
                 </div>
               </div>
-
-              <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.78rem', color: '#94A3B8', fontWeight: '600' }}>
-                  Visits Logged: {p.visits.length}
-                </span>
-
-                <button
-                  className="btn btn-primary btn-sm"
-                  style={{ padding: '0.4rem 0.85rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-                  onClick={() => setSelectedPatientId(p.id)}
-                >
-                  <Eye size={14} /> Open Records
-                </button>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       ) : (
         // Detailed Patient EHR File View (2 Columns Layout)
@@ -206,6 +303,7 @@ const MedicalRecordsPage = () => {
                 src={selectedPatient.avatar}
                 alt={selectedPatient.name}
                 style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '3px solid #EEF4FF', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', marginBottom: '0.75rem' }}
+                onError={e => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedPatient.name)}&background=EEF4FF&color=0066FF&size=100`; }}
               />
               <h3 style={{ fontSize: '1.15rem', fontWeight: '900', color: '#0F172A', margin: 0 }}>{selectedPatient.name}</h3>
               <span style={{ fontSize: '0.78rem', color: '#64748B', background: '#F1F5F9', padding: '0.2rem 0.6rem', borderRadius: '6px', fontWeight: '700', marginTop: '0.35rem' }}>

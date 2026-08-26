@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { patientApi, authApi } from '../services/api';
 import {
   Bed,
   Search,
@@ -48,6 +49,27 @@ const BedManagementPage = () => {
   });
 
   const [targetWard, setTargetWard] = useState('General Male Ward');
+  const [patientOptions, setPatientOptions] = useState([]);
+  const [doctorOptions, setDoctorOptions] = useState([]);
+
+  // Fetch real patients and doctors for admit form
+  useEffect(() => {
+    const fetchOptions = async () => {
+      try {
+        const [patientsRes, doctorsRes] = await Promise.all([
+          patientApi.getAllPatients(''),
+          authApi.getDoctors()
+        ]);
+        const pats = patientsRes.data?.patients || [];
+        const docs = doctorsRes.data?.doctors || doctorsRes.data || [];
+        if (pats.length > 0) setPatientOptions(pats.map(p => p.name));
+        if (docs.length > 0) setDoctorOptions(docs.map(d => d.name ? 'Dr. ' + d.name : 'Dr. Specialist'));
+      } catch (err) {
+        console.error('Bed management options fetch error:', err);
+      }
+    };
+    fetchOptions();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('caresync_beds_list', JSON.stringify(beds));

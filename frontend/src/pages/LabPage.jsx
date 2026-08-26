@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { patientApi, authApi } from '../services/api';
 import {
   Activity,
   Search,
@@ -23,8 +24,31 @@ import {
 const LabPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [activeTest, setActiveTest] = useState(null); // Selected test for entering results
-  const [viewReport, setViewReport] = useState(null); // Selected test for viewing report
+  const [activeTest, setActiveTest] = useState(null);
+  const [viewReport, setViewReport] = useState(null);
+  const [patientOptions, setPatientOptions] = useState([]);
+  const [doctorOptions, setDoctorOptions] = useState([]);
+
+  // Fetch real patients and doctors to populate form dropdowns
+  useEffect(() => {
+    const fetchOptions = async () => {
+      try {
+        const [patientsRes, doctorsRes] = await Promise.all([
+          patientApi.getAllPatients(''),
+          authApi.getDoctors()
+        ]);
+        const pats = patientsRes.data?.patients || [];
+        const docs = doctorsRes.data?.doctors || doctorsRes.data || [];
+        if (pats.length > 0) setPatientOptions(pats.map(p => p.name));
+        if (docs.length > 0) setDoctorOptions(docs.map(d => d.name ? 'Dr. ' + d.name : 'Dr. Specialist'));
+      } catch (err) {
+        console.error('Lab options fetch error:', err);
+      }
+    };
+    fetchOptions();
+  }, []);
+
+
 
   // Initial Diagnostic Tests and Requests list
   const [tests, setTests] = useState([

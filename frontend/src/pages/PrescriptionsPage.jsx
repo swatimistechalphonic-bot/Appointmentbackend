@@ -1,25 +1,16 @@
-import React, { useState } from 'react';
-import {
-  FileText,
-  Search,
-  Plus,
-  Trash2,
-  X,
-  Printer,
-  Download,
-  Calendar,
-  User,
-  PlusCircle,
-  AlertCircle
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { FileText, Search, Plus, Trash2, X, Printer, Download, Calendar, User, PlusCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { appointmentApi, patientApi, authApi } from '../services/api';
 
 const PrescriptionsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewPrescription, setViewPrescription] = useState(null); // Selected prescription for print preview
+  const [viewPrescription, setViewPrescription] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [apiLoading, setApiLoading] = useState(true);
+  const [patientOptions, setPatientOptions] = useState([]);
+  const [doctorOptions, setDoctorOptions] = useState([]);
 
-  // Initial Prescriptions List
-  const [prescriptions, setPrescriptions] = useState([
+  const defaultPrescriptions = [
     {
       id: 'RX-2026-001',
       patientName: 'Swati Verma',
@@ -51,7 +42,10 @@ const PrescriptionsPage = () => {
         { name: 'Atorvastatin', dosage: '10 mg', frequency: 'Once daily at night (0-0-1)', duration: '30 Days', instructions: 'Post dinner' }
       ]
     }
-  ]);
+  ];
+
+  const [prescriptions, setPrescriptions] = useState(defaultPrescriptions);
+
 
   // Form states for creating a new prescription
   const [createFormData, setCreateFormData] = useState({
@@ -68,6 +62,47 @@ const PrescriptionsPage = () => {
     { name: '', dosage: '', frequency: '', duration: '', instructions: 'Post meals' }
   ]);
 
+  // ─── API Integration ──────────────────────────────────────────
+  const fetchPrescriptionsFromAPI = async () => {
+    setApiLoading(true);
+    try {
+      const [appointmentsRes, patientsRes, doctorsRes] = await Promise.all([
+        appointmentApi.getAllAppointments({ status: 'completed' }),
+        patientApi.getAllPatients(''),
+        authApi.getDoctors()
+      ]);
+      const pats = patientsRes.data?.patients || [];
+      setPatientOptions(pats.map(p => p.name));
+      const docs = doctorsRes.data?.doctors || doctorsRes.data || [];
+      setDoctorOptions(docs.map(d => d.name ? 'Dr. ' + d.name : d));
+      const appts = appointmentsRes.data?.appointments || [];
+      const apiPrescriptions = appts
+        .filter(a => a.notes || a.reason)
+        .map((a, idx) => ({
+          id: 'RX-API-' + String(idx + 1).padStart(3, '0'),
+          patientName: a.user?.name || 'Patient',
+          age: 30,
+          gender: '—',
+          doctorName: a.doctorName || (a.doctor?.name ? 'Dr. ' + a.doctor.name : 'Dr. Specialist'),
+          diagnosis: a.reason || 'Routine Consultation',
+          date: a.date || new Date().toISOString().split('T')[0],
+          followUp: '—',
+          notes: a.notes || 'No additional notes.',
+          medicines: []
+        }));
+      if (apiPrescriptions.length > 0) {
+        setPrescriptions([...defaultPrescriptions, ...apiPrescriptions]);
+      }
+    } catch (err) {
+      console.error('Prescriptions fetch error:', err);
+    } finally {
+      setApiLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchPrescriptionsFromAPI(); }, []);
+  // ─────────────────────────────────────────────────────────────
+
   const filteredPrescriptions = prescriptions.filter(
     (p) =>
       p.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -77,8 +112,9 @@ const PrescriptionsPage = () => {
 
   // Calculate Metrics
   const totalCount = prescriptions.length;
-  const todayCount = prescriptions.filter(p => p.date === '2026-08-24').length;
+  const todayCount = prescriptions.filter(p => p.date === new Date().toISOString().split('T')[0]).length;
   const totalMedicinesCount = prescriptions.reduce((sum, p) => sum + p.medicines.length, 0);
+
 
   // Form helpers
   const handleAddMedicineRow = () => {
