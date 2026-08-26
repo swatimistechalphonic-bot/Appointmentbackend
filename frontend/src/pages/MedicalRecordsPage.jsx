@@ -16,7 +16,7 @@ import {
   RefreshCw,
   AlertCircle
 } from 'lucide-react';
-import { patientApi, appointmentApi } from '../services/api';
+import { patientApi, appointmentApi, prescriptionApi } from '../services/api';
 
 const defaultPatientsEHR = [
   {
@@ -84,21 +84,47 @@ const defaultPatientsEHR = [
   }
 ];
 
-// Convert a DB patient + their appointments into EHR format
-const buildEHRFromAPI = (patient, appointments) => {
-  const visits = appointments
+// Convert a DB patient + their appointments + prescriptions into EHR format
+const buildEHRFromAPI = (patient, appointments, prescriptions = []) => {
+  const patientPrescriptions = prescriptions.filter(
+    rx => (rx.patient && rx.patient === patient._id) || (rx.patientName && rx.patientName.toLowerCase() === patient.name.toLowerCase())
+  );
+
+  const visitsFromAppointments = appointments
     .filter(a => a.user?._id === patient._id || a.user === patient._id)
-    .map(a => ({
-      date: a.date,
-      doctorName: a.doctorName || (a.doctor?.name ? `Dr. ${a.doctor.name}` : 'Dr. Specialist'),
-      specialty: a.specialization || 'General',
-      diagnosis: a.reason || 'Routine Consultation',
+    .map(a => {
+      const matchedRx = patientPrescriptions.find(rx => rx.date === a.date || rx.appointment === a._id);
+      return {
+        date: a.date,
+        doctorName: a.doctorName || (a.doctor?.name ? `Dr. ${a.doctor.name}` : 'Dr. Specialist'),
+        specialty: a.specialization || 'General',
+        diagnosis: a.reason || (matchedRx ? matchedRx.diagnosis : 'Routine Consultation'),
+        vitals: { bp: '—', temp: '—', hr: '—' },
+        notes: a.notes || (matchedRx ? matchedRx.notes : 'No detailed notes recorded for this visit.'),
+        prescription: { medicines: matchedRx ? matchedRx.medicines : [] },
+        labs: []
+      };
+    });
+
+  // Also include any standalone digital prescriptions that don't match an appointment
+  const standaloneVisits = patientPrescriptions
+    .filter(rx => !visitsFromAppointments.some(v => v.date === rx.date))
+    .map(rx => ({
+      date: rx.date,
+      doctorName: rx.doctorName || 'Dr. Specialist',
+      specialty: 'Clinical Consultation',
+      diagnosis: rx.diagnosis,
       vitals: { bp: '—', temp: '—', hr: '—' },
-      notes: a.notes || 'No detailed notes recorded for this visit.',
-      prescription: { medicines: [] },
+      notes: rx.notes || 'Digital prescription issued.',
+      prescription: { medicines: rx.medicines || [] },
       labs: []
-    }))
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
+    }));
+
+  const allVisits = [...visitsFromAppointments, ...standaloneVisits].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const allMedNames = patientPrescriptions
+    .flatMap(rx => (rx.medicines || []).map(m => `${m.name} ${m.dosage || ''}`.trim()))
+    .filter(Boolean);
 
   return {
     id: patient._id,
@@ -111,9 +137,9 @@ const buildEHRFromAPI = (patient, appointments) => {
     address: patient.address || '—',
     allergies: patient.medicalHistory?.includes('allerg') ? patient.medicalHistory : 'None reported',
     medicalHistory: patient.medicalHistory || 'No chronic conditions recorded',
-    currentMedications: patient.currentMedications || 'None',
+    currentMedications: allMedNames.length > 0 ? allMedNames.join(', ') : (patient.currentMedications || 'None'),
     avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(patient.name)}&background=EEF4FF&color=0066FF&size=100`,
-    visits: visits.length > 0 ? visits : [{
+    visits: allVisits.length > 0 ? allVisits : [{
       date: new Date().toISOString().split('T')[0],
       doctorName: 'Dr. Rahul Sharma',
       specialty: 'General Physician',
@@ -137,24 +163,25 @@ const MedicalRecordsPage = () => {
     setLoading(true);
     setError('');
     try {
-      // Fetch patients and all appointments in parallel
-      const [patientsRes, appointmentsRes] = await Promise.all([
+      // Fetch patients, appointments, and prescriptions in parallel
+      const [patientsRes, appointmentsRes, prescriptionsRes] = await Promise.all([
         patientApi.getAllPatients(''),
-        appointmentApi.getAllAppointments({})
+        appointmentApi.getAllAppointments({}),
+        prescriptionApi.getAllPrescriptions()
       ]);
 
       const patients = patientsRes.data?.patients || [];
       const appointments = appointmentsRes.data?.appointments || [];
+      const prescriptions = prescriptionsRes.data?.data || [];
 
       if (patients.length > 0) {
-        const ehrList = patients.map(p => buildEHRFromAPI(p, appointments));
+        const ehrList = patients.map(p => buildEHRFromAPI(p, appointments, prescriptions));
         setPatientsEHR(ehrList);
       } else {
         setPatientsEHR(defaultPatientsEHR);
       }
     } catch (err) {
       console.error('EHR Fetch Error:', err);
-      // Silently fall back to default data
       setPatientsEHR(defaultPatientsEHR);
     } finally {
       setLoading(false);

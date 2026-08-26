@@ -1,0 +1,132 @@
+version: '3.9'
+
+networks:
+  caresync_net:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  redis_data:
+
+services:
+
+  # ─────────────────────────────────────────────
+  # Database
+  # ─────────────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: caresync_mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: caresync@2026
+    networks:
+      - caresync_net
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: caresync_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --requirepass caresync_redis_pass
+    networks:
+      - caresync_net
+
+  # ─────────────────────────────────────────────
+  # API Gateway
+  # ─────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: ../../
+      dockerfile: ./infrastructure/docker/Dockerfile.gateway
+    container_name: caresync_gateway
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - GATEWAY_PORT=5000
+      - MONGODB_URI=mongodb://admin:caresync@2026@mongodb:27017/caresync?authSource=admin
+      - REDIS_URL=redis://:caresync_redis_pass@redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - caresync_net
+
+  # ─────────────────────────────────────────────
+  # Nginx Reverse Proxy
+  # ─────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: caresync_nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api-gateway
+    networks:
+      - caresync_net
+
+  # ─────────────────────────────────────────────
+  # Frontend Apps
+  # ─────────────────────────────────────────────
+  frontend-admin:
+    build:
+      context: ../../frontend
+      dockerfile: ../infrastructure/docker/Dockerfile.frontend
+      args:
+        APP_DIR: admin
+    container_name: caresync_admin_app
+    restart: always
+    ports:
+      - "3000:80"
+    networks:
+      - caresync_net
+
+  frontend-patient:
+    build:
+      context: ../../frontend
+      dockerfile: ../infrastructure/docker/Dockerfile.frontend
+      args:
+        APP_DIR: patient
+    container_name: caresync_patient_app
+    restart: always
+    ports:
+      - "3003:80"
+    networks:
+      - caresync_net
+
+  # ─────────────────────────────────────────────
+  # Monitoring
+  # ─────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: caresync_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - caresync_net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: caresync_grafana
+    ports:
+      - "3100:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=caresync123
+    networks:
+      - caresync_net

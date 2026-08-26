@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { appointmentApi } from '../services/api';
+import { appointmentApi, prescriptionApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import BookAppointmentModal from '../components/BookAppointmentModal';
 import {
@@ -15,7 +15,9 @@ import {
   TrendingDown,
   MoreVertical,
   PlusCircle,
-  ShieldAlert
+  ShieldAlert,
+  FileText,
+  Pill
 } from 'lucide-react';
 
 const DoctorDashboard = () => {
@@ -28,12 +30,16 @@ const DoctorDashboard = () => {
     totalPatients: '2,356',
     completedAppointments: '1,024',
     cancelledAppointments: '18',
-    totalRevenue: '₹1,24,560'
+    totalRevenue: '₹1,24,560',
+    totalPrescriptions: 0,
+    prescriptionsToday: 0
   });
 
   const [appointments, setAppointments] = useState([]);
+  const [recentPrescriptions, setRecentPrescriptions] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState(null);
+  const [dashboardTab, setDashboardTab] = useState('appointments'); // 'appointments' | 'prescriptions'
 
   // Close 3-dots dropdown when clicking outside
   useEffect(() => {
@@ -87,14 +93,33 @@ const DoctorDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const statsRes = await appointmentApi.getDashboardStats();
-      const appRes = await appointmentApi.getAllAppointments();
+      const [statsRes, appRes, rxStatsRes, rxListRes] = await Promise.allSettled([
+        appointmentApi.getDashboardStats(),
+        appointmentApi.getAllAppointments(),
+        prescriptionApi.getStats(),
+        prescriptionApi.getAllPrescriptions()
+      ]);
 
-      const liveApps = appRes.data?.appointments || [];
+      const liveApps = appRes.status === 'fulfilled' ? (appRes.value?.data?.appointments || []) : [];
       setAppointments(liveApps);
 
-      if (statsRes.data?.success && statsRes.data.stats) {
-        setStats(statsRes.data.stats);
+      if (rxListRes.status === 'fulfilled' && rxListRes.value?.data?.data) {
+        setRecentPrescriptions(rxListRes.value.data.data.slice(0, 5));
+      }
+
+      let rxTotal = 0;
+      let rxToday = 0;
+      if (rxStatsRes.status === 'fulfilled' && rxStatsRes.value?.data?.data) {
+        rxTotal = rxStatsRes.value.data.data.totalCount || 0;
+        rxToday = rxStatsRes.value.data.data.todayCount || 0;
+      }
+
+      if (statsRes.status === 'fulfilled' && statsRes.value?.data?.success && statsRes.value?.data?.stats) {
+        setStats({
+          ...statsRes.value.data.stats,
+          totalPrescriptions: rxTotal,
+          prescriptionsToday: rxToday
+        });
       } else if (liveApps.length > 0) {
         const total = liveApps.length;
         const todayStr = new Date().toISOString().split('T')[0];
@@ -112,7 +137,9 @@ const DoctorDashboard = () => {
           totalPatients: new Set(liveApps.map(a => a.user?.id || a.user?._id || a.user?.name || a.user)).size || 1,
           completedAppointments: completedCount,
           cancelledAppointments: cancelledCount,
-          totalRevenue: `₹${totalRevenueVal.toLocaleString('en-IN')}`
+          totalRevenue: `₹${totalRevenueVal.toLocaleString('en-IN')}`,
+          totalPrescriptions: rxTotal,
+          prescriptionsToday: rxToday
         });
       }
     } catch (err) {
@@ -123,16 +150,12 @@ const DoctorDashboard = () => {
   const metricsData = [
     { title: 'Total Appointments', value: stats.totalAppointments, trend: '12.5%', isUp: true, icon: Calendar, cardBg: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', border: '#BFDBFE', iconBg: '#0066FF', valColor: '#1E40AF', labelColor: '#3B82F6' },
     { title: "Today's Appointments", value: stats.todayAppointments, trend: '8.4%', isUp: true, icon: Clock, cardBg: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', border: '#A7F3D0', iconBg: '#10B981', valColor: '#065F46', labelColor: '#059669' },
+    { title: 'Digital Prescriptions', value: `${stats.totalPrescriptions || 0} Issued`, trend: '14.2%', isUp: true, icon: FileText, cardBg: 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)', border: '#86EFAC', iconBg: '#16A34A', valColor: '#14532D', labelColor: '#15803D' },
     { title: 'Pending Appointments', value: stats.pendingAppointments, trend: '3.2%', isUp: false, icon: Hourglass, cardBg: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)', border: '#FDE68A', iconBg: '#F59E0B', valColor: '#92400E', labelColor: '#D97706' },
     { title: 'Total Doctors', value: stats.totalDoctors, trend: '4.7%', isUp: true, icon: UserCheck, cardBg: 'linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%)', border: '#DDD6FE', iconBg: '#8B5CF6', valColor: '#6B21A8', labelColor: '#7C3AED' },
     { title: 'Total Patients', value: stats.totalPatients, trend: '10.3%', isUp: true, icon: Users, cardBg: 'linear-gradient(135deg, #FFE4E6 0%, #FECDD3 100%)', border: '#FECDD3', iconBg: '#F43F5E', valColor: '#9F1239', labelColor: '#E11D48' },
     { title: 'Completed Appointments', value: stats.completedAppointments, trend: '15.6%', isUp: true, icon: CheckCircle2, cardBg: 'linear-gradient(135deg, #E0F2FE 0%, #BAE6FD 100%)', border: '#BAE6FD', iconBg: '#06B6D4', valColor: '#075985', labelColor: '#0284C7' },
-    { title: 'Cancelled Appointments', value: stats.cancelledAppointments, trend: '2.1%', isUp: false, icon: XCircle, cardBg: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)', border: '#FECACA', iconBg: '#EF4444', valColor: '#991B1B', labelColor: '#DC2626' },
     { title: 'Total Revenue', value: stats.totalRevenue, trend: '18.6%', isUp: true, icon: DollarSign, cardBg: 'linear-gradient(135deg, #FEF9C3 0%, #FEF08A 100%)', border: '#FEF08A', iconBg: '#D97706', valColor: '#854D0E', labelColor: '#B45309' },
-    { title: "Today's Available Slots", value: stats.todayAvailableSlots || '186', trend: '4.2%', isUp: true, icon: Clock, cardBg: 'linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 100%)', border: '#DDD6FE', iconBg: '#8B5CF6', valColor: '#4C1D95', labelColor: '#7C3AED' },
-    { title: "Today's Waiting Patients", value: stats.todayWaitingPatients || '0', trend: '2.1%', isUp: false, icon: Users, cardBg: 'linear-gradient(135deg, #FFF1F2 0%, #FFE4E6 100%)', border: '#FECDD3', iconBg: '#F43F5E', valColor: '#9F1239', labelColor: '#E11D48' },
-    { title: "Today's Revenue", value: stats.todayRevenue || '₹0', trend: '12.4%', isUp: true, icon: DollarSign, cardBg: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', border: '#A7F3D0', iconBg: '#10B981', valColor: '#065F46', labelColor: '#059669' },
-    { title: 'No-show Rate', value: stats.noShowRate || '0.0%', trend: '0.0%', isUp: false, icon: ShieldAlert, cardBg: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)', border: '#FDE68A', iconBg: '#F59E0B', valColor: '#92400E', labelColor: '#D97706' },
   ];
 
   const screenshotPatients = [
@@ -308,116 +331,199 @@ const DoctorDashboard = () => {
           </div>
         </div>
 
-        {/* Recent Appointments Table Card */}
+        {/* Recent Appointments & Prescriptions Table Card */}
         <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div className="card-header-flex" style={{ marginBottom: '0.5rem' }}>
-            <h2 className="card-title" style={{ fontSize: '1rem' }}>Recent Appointments</h2>
-            <button className="btn btn-secondary btn-sm" style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}>View All</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button
+                onClick={() => setDashboardTab('appointments')}
+                style={{
+                  background: dashboardTab === 'appointments' ? '#EFF6FF' : 'transparent',
+                  color: dashboardTab === 'appointments' ? '#0066FF' : '#64748B',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.35rem 0.75rem',
+                  fontWeight: '800',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Appointments ({recentList.length})
+              </button>
+              <button
+                onClick={() => setDashboardTab('prescriptions')}
+                style={{
+                  background: dashboardTab === 'prescriptions' ? '#EFF6FF' : 'transparent',
+                  color: dashboardTab === 'prescriptions' ? '#0066FF' : '#64748B',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.35rem 0.75rem',
+                  fontWeight: '800',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Digital Prescriptions ({recentPrescriptions.length})
+              </button>
+            </div>
+
+            <a href={dashboardTab === 'appointments' ? '/appointments' : '/prescriptions'} className="btn btn-secondary btn-sm" style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem', textDecoration: 'none' }}>
+              View All
+            </a>
           </div>
 
           <div style={{ overflowX: 'auto', flex: 1 }}>
-            <table className="doc-table">
-              <thead>
-                <tr>
-                  <th style={{ padding: '0.4rem 0.6rem' }}>Patient</th>
-                  <th style={{ padding: '0.4rem 0.6rem' }}>Doctor</th>
-                  <th style={{ padding: '0.4rem 0.6rem' }}>Date & Time</th>
-                  <th style={{ padding: '0.4rem 0.6rem' }}>Status</th>
-                  <th style={{ padding: '0.4rem 0.6rem' }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentList.map((row) => (
-                  <tr key={row.id}>
-                    <td style={{ padding: '0.45rem 0.6rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <img src={row.avatar} alt={row.patient} style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover' }} />
-                        <span style={{ fontWeight: '700', color: '#0F172A', fontSize: '0.82rem' }}>{row.patient}</span>
-                      </div>
-                    </td>
-                    <td style={{ padding: '0.45rem 0.6rem' }}>
-                      <div style={{ lineHeight: '1.2' }}>
-                        <div style={{ fontWeight: '700', color: '#0F172A', fontSize: '0.82rem' }}>{row.doctor}</div>
-                        <div style={{ fontSize: '0.72rem', color: '#64748B' }}>{row.dept}</div>
-                      </div>
-                    </td>
-                    <td style={{ padding: '0.45rem 0.6rem', color: '#475569', fontSize: '0.78rem', fontWeight: '500' }}>
-                      {row.time}
-                    </td>
-                    <td style={{ padding: '0.45rem 0.6rem' }}>
-                      <span className={`doc-badge ${row.status === 'Confirmed' ? 'confirmed' : row.status === 'Cancelled' ? 'cancelled' : 'pending'}`} style={{ padding: '0.2rem 0.6rem', fontSize: '0.72rem' }}>
-                        {row.status}
-                      </span>
-                    </td>
-                    <td style={{ padding: '0.45rem 0.6rem', textAlign: 'center' }}>
-                      <div className="action-dropdown-container">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveMenuId(activeMenuId === row.id ? null : row.id);
-                          }}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '0.25rem',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            borderRadius: '4px',
-                            transition: 'background-color 0.2s'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F1F5F9'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          title="Actions"
-                        >
-                          <MoreVertical size={16} color="#94A3B8" />
-                        </button>
-                        
-                        {activeMenuId === row.id && (
-                          <div className="action-dropdown-menu">
-                            {row.status !== 'Confirmed' && row.status !== 'Completed' && (
-                              <button 
-                                className="action-dropdown-item" 
-                                onClick={() => handleUpdateStatus(row.id, 'confirmed')}
-                              >
-                                <span style={{ width: '8px', height: '8px', backgroundColor: '#10B981', borderRadius: '50%' }} />
-                                Confirm
-                              </button>
-                            )}
-                            {row.status !== 'Completed' && (
-                              <button 
-                                className="action-dropdown-item" 
-                                onClick={() => handleUpdateStatus(row.id, 'completed')}
-                              >
-                                <span style={{ width: '8px', height: '8px', backgroundColor: '#0066FF', borderRadius: '50%' }} />
-                                Complete
-                              </button>
-                            )}
-                            {row.status !== 'Cancelled' && (
-                              <button 
-                                className="action-dropdown-item" 
-                                onClick={() => handleUpdateStatus(row.id, 'cancelled')}
-                              >
-                                <span style={{ width: '8px', height: '8px', backgroundColor: '#F43F5E', borderRadius: '50%' }} />
-                                Cancel
-                              </button>
-                            )}
-                            <button 
-                              className="action-dropdown-item danger" 
-                              onClick={() => handleDeleteAppointment(row.id)}
-                              style={{ borderTop: '1px solid #F1F5F9', marginTop: '0.2rem', paddingTop: '0.4rem' }}
-                            >
-                              <XCircle size={14} color="#DC2626" />
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </td>
+            {dashboardTab === 'appointments' ? (
+              <table className="doc-table">
+                <thead>
+                  <tr>
+                    <th style={{ padding: '0.4rem 0.6rem' }}>Patient</th>
+                    <th style={{ padding: '0.4rem 0.6rem' }}>Doctor</th>
+                    <th style={{ padding: '0.4rem 0.6rem' }}>Date & Time</th>
+                    <th style={{ padding: '0.4rem 0.6rem' }}>Status</th>
+                    <th style={{ padding: '0.4rem 0.6rem' }}></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {recentList.map((row) => (
+                    <tr key={row.id}>
+                      <td style={{ padding: '0.45rem 0.6rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <img src={row.avatar} alt={row.patient} style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover' }} />
+                          <span style={{ fontWeight: '700', color: '#0F172A', fontSize: '0.82rem' }}>{row.patient}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '0.45rem 0.6rem' }}>
+                        <div style={{ lineHeight: '1.2' }}>
+                          <div style={{ fontWeight: '700', color: '#0F172A', fontSize: '0.82rem' }}>{row.doctor}</div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748B' }}>{row.dept}</div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '0.45rem 0.6rem', color: '#475569', fontSize: '0.78rem', fontWeight: '500' }}>
+                        {row.time}
+                      </td>
+                      <td style={{ padding: '0.45rem 0.6rem' }}>
+                        <span className={`doc-badge ${row.status === 'Confirmed' ? 'confirmed' : row.status === 'Cancelled' ? 'cancelled' : 'pending'}`} style={{ padding: '0.2rem 0.6rem', fontSize: '0.72rem' }}>
+                          {row.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.45rem 0.6rem', textAlign: 'center' }}>
+                        <div className="action-dropdown-container">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuId(activeMenuId === row.id ? null : row.id);
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: '0.25rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              borderRadius: '4px',
+                              transition: 'background-color 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F1F5F9'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            title="Actions"
+                          >
+                            <MoreVertical size={16} color="#94A3B8" />
+                          </button>
+                          
+                          {activeMenuId === row.id && (
+                            <div className="action-dropdown-menu">
+                              {row.status !== 'Confirmed' && row.status !== 'Completed' && (
+                                <button 
+                                  className="action-dropdown-item" 
+                                  onClick={() => handleUpdateStatus(row.id, 'confirmed')}
+                                >
+                                  <span style={{ width: '8px', height: '8px', backgroundColor: '#10B981', borderRadius: '50%' }} />
+                                  Confirm
+                                </button>
+                              )}
+                              {row.status !== 'Completed' && (
+                                <button 
+                                  className="action-dropdown-item" 
+                                  onClick={() => handleUpdateStatus(row.id, 'completed')}
+                                >
+                                  <span style={{ width: '8px', height: '8px', backgroundColor: '#0066FF', borderRadius: '50%' }} />
+                                  Complete
+                                </button>
+                              )}
+                              {row.status !== 'Cancelled' && (
+                                <button 
+                                  className="action-dropdown-item" 
+                                  onClick={() => handleUpdateStatus(row.id, 'cancelled')}
+                                >
+                                  <span style={{ width: '8px', height: '8px', backgroundColor: '#F43F5E', borderRadius: '50%' }} />
+                                  Cancel
+                                </button>
+                              )}
+                              <button 
+                                className="action-dropdown-item danger" 
+                                onClick={() => handleDeleteAppointment(row.id)}
+                                style={{ borderTop: '1px solid #F1F5F9', marginTop: '0.2rem', paddingTop: '0.4rem' }}
+                              >
+                                <XCircle size={14} color="#DC2626" />
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <table className="doc-table">
+                <thead>
+                  <tr>
+                    <th style={{ padding: '0.4rem 0.6rem' }}>Rx ID</th>
+                    <th style={{ padding: '0.4rem 0.6rem' }}>Patient Name</th>
+                    <th style={{ padding: '0.4rem 0.6rem' }}>Doctor</th>
+                    <th style={{ padding: '0.4rem 0.6rem' }}>Diagnosis</th>
+                    <th style={{ padding: '0.4rem 0.6rem' }}>Medicines</th>
+                    <th style={{ padding: '0.4rem 0.6rem' }}>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentPrescriptions.length > 0 ? (
+                    recentPrescriptions.map((rx) => (
+                      <tr key={rx._id || rx.prescriptionId}>
+                        <td style={{ padding: '0.45rem 0.6rem', fontWeight: '800', color: '#0066FF', fontSize: '0.8rem' }}>
+                          {rx.prescriptionId || 'RX-001'}
+                        </td>
+                        <td style={{ padding: '0.45rem 0.6rem', fontWeight: '700', color: '#0F172A', fontSize: '0.82rem' }}>
+                          {rx.patientName}
+                        </td>
+                        <td style={{ padding: '0.45rem 0.6rem', color: '#475569', fontSize: '0.78rem' }}>
+                          {rx.doctorName}
+                        </td>
+                        <td style={{ padding: '0.45rem 0.6rem', color: '#0F172A', fontWeight: '600', fontSize: '0.78rem' }}>
+                          {rx.diagnosis}
+                        </td>
+                        <td style={{ padding: '0.45rem 0.6rem' }}>
+                          <span style={{ background: '#ECFDF5', color: '#166534', padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '700' }}>
+                            {rx.medicines ? rx.medicines.length : 0} items
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.45rem 0.6rem', color: '#64748B', fontSize: '0.75rem' }}>
+                          {rx.date}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} style={{ padding: '1.5rem', textAlign: 'center', color: '#94A3B8' }}>
+                        No digital prescriptions issued yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>
