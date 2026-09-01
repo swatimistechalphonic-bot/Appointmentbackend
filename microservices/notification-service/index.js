@@ -1,86 +1,87 @@
+require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 const express = require('express');
+const cors = require('cors');
 const mongoose = require('mongoose');
-const router = express.Router();
-const { sendSuccess, sendError } = require('../shared/utils/responseHelper');
-const { HTTP_STATUS } = require('../shared/constants');
 
-// ── Notification Schema ───────────────────────────────────────────────────────
+const app = express();
+const PORT = process.env.PORT || 5007;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/appointment_notification_db';
+
+app.use(cors());
+app.use(express.json());
+
+// ── Connect DB ───────────────────────────────────────────────────────────────
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('✅ Notification Service connected to MongoDB'))
+  .catch((err) => console.error('❌ Notification Service DB Connection Error:', err.message));
+
+// ── Notification Log Schema ───────────────────────────────────────────────────
 const notificationSchema = new mongoose.Schema({
-  recipient:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  type:         { type: String, required: true },
-  title:        { type: String, required: true },
-  message:      { type: String, required: true },
-  data:         { type: mongoose.Schema.Types.Mixed, default: {} },
-  channel:      { type: [String], default: ['in_app'] }, // 'in_app', 'email', 'sms', 'push'
-  isRead:       { type: Boolean, default: false },
-  readAt:       { type: Date, default: null },
-  sentAt:       { type: Date, default: Date.now },
+  userId: { type: String, required: true },
+  type: { type: String, enum: ['Email', 'SMS', 'Push'], default: 'Email' },
+  recipient: { type: String, required: true },
+  subject: { type: String, default: '' },
+  message: { type: String, required: true },
+  status: { type: String, enum: ['sent', 'failed', 'queued'], default: 'sent' },
+  organizationId: { type: String, default: null }
 }, { timestamps: true });
 
 const Notification = mongoose.models.Notification || mongoose.model('Notification', notificationSchema);
 
-// GET /api/notifications?userId=xxx
-router.get('/', async (req, res) => {
+// ── Health Check ──────────────────────────────────────────────────────────────
+app.get('/health', (req, res) => {
+  res.json({
+    service: 'Notification Service',
+    status: 'UP',
+    port: PORT,
+    database: mongoose.connection.readyState === 1 ? 'CONNECTED' : 'DISCONNECTED',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ── Routes ────────────────────────────────────────────────────────────────────
+app.get('/api/notifications', async (req, res) => {
   try {
-    const { userId, unreadOnly } = req.query;
-    if (!userId) return sendError(res, 'userId is required.', HTTP_STATUS.BAD_REQUEST);
-    const filter = { recipient: userId };
-    if (unreadOnly === 'true') filter.isRead = false;
-    const notifications = await Notification.find(filter).sort({ createdAt: -1 }).limit(50);
-    const unreadCount = await Notification.countDocuments({ recipient: userId, isRead: false });
-    return sendSuccess(res, { notifications, unreadCount }, 'Notifications fetched');
+    const { userId, organizationId } = req.query;
+    const filter = {};
+    if (userId) filter.userId = userId;
+    if (organizationId) filter.organizationId = organizationId;
+
+    const notifications = await Notification.find(filter).sort({ createdAt: -1 });
+    res.json({ success: true, count: notifications.length, data: notifications });
   } catch (err) {
-    return sendError(res, err.message);
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// POST /api/notifications — Send a notification
-router.post('/', async (req, res) => {
+app.post('/api/notifications/send', async (req, res) => {
   try {
-    const { recipient, type, title, message, data, channel } = req.body;
-    if (!recipient || !title || !message)
-      return sendError(res, 'recipient, title, and message are required.', HTTP_STATUS.BAD_REQUEST);
-    const notification = await Notification.create({ recipient, type, title, message, data, channel });
-    // TODO: Hook into email/SMS providers here
-    return sendSuccess(res, notification, 'Notification sent', HTTP_STATUS.CREATED);
+    const { userId, type, recipient, subject, message, organizationId } = req.body;
+    if (!userId || !recipient || !message) {
+      return res.status(400).json({ success: false, message: 'userId, recipient, and message are required.' });
+    }
+
+    const notification = await Notification.create({
+      userId,
+      type: type || 'Email',
+      recipient,
+      subject: subject || 'CareSync Notification',
+      message,
+      status: 'sent',
+      organizationId: organizationId || null
+    });
+
+    console.log(`[Notification Service] 📧 Notification sent to ${recipient}: ${subject}`);
+    res.status(201).json({ success: true, message: 'Notification sent successfully!', data: notification });
   } catch (err) {
-    return sendError(res, err.message);
+    res.status(400).json({ success: false, message: err.message });
   }
 });
 
-// PATCH /api/notifications/:id/read — Mark as read
-router.patch('/:id/read', async (req, res) => {
-  try {
-    const notification = await Notification.findByIdAndUpdate(
-      req.params.id, { isRead: true, readAt: new Date() }, { new: true }
-    );
-    if (!notification) return sendError(res, 'Notification not found.', HTTP_STATUS.NOT_FOUND);
-    return sendSuccess(res, notification, 'Marked as read');
-  } catch (err) {
-    return sendError(res, err.message);
-  }
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Notification Service running independently on port ${PORT}`);
+  });
+}
 
-// PATCH /api/notifications/mark-all-read — Mark all read for user
-router.patch('/mark-all-read', async (req, res) => {
-  try {
-    const { userId } = req.body;
-    if (!userId) return sendError(res, 'userId required.', HTTP_STATUS.BAD_REQUEST);
-    await Notification.updateMany({ recipient: userId, isRead: false }, { isRead: true, readAt: new Date() });
-    return sendSuccess(res, null, 'All notifications marked as read');
-  } catch (err) {
-    return sendError(res, err.message);
-  }
-});
-
-// DELETE /api/notifications/:id
-router.delete('/:id', async (req, res) => {
-  try {
-    await Notification.findByIdAndDelete(req.params.id);
-    return sendSuccess(res, null, 'Notification deleted');
-  } catch (err) {
-    return sendError(res, err.message);
-  }
-});
-
-module.exports = { serviceName: 'Notification Service', basePath: '/api/notifications', router };
+module.exports = app;

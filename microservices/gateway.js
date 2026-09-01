@@ -24,6 +24,9 @@ const auditService = require('./audit-service');
 const serviceService = require('./service-service');
 const labService = require('./lab-service');
 const bedService = require('./bed-service');
+const dischargeSummaryService = require('./discharge-summary-service');
+const vaccinationService = require('./vaccination-service');
+const documentService = require('./document-service');
 
 const services = [
     authService,
@@ -48,7 +51,10 @@ const services = [
     auditService,
     serviceService,
     labService,
-    bedService
+    bedService,
+    dischargeSummaryService,
+    vaccinationService,
+    documentService
 ];
 
 const registerMicroservices = (app) => {

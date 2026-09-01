@@ -2,6 +2,50 @@ const express = require('express');
 const router = express.Router();
 const DischargeSummary = require('../models/DischargeSummary');
 
+const seedInitialSummaries = async () => {
+    try {
+        const count = await DischargeSummary.countDocuments();
+        if (count === 0) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const initialSummaries = [
+                {
+                    id: 'DS-7001',
+                    patientName: 'Vikram Sharma',
+                    age: 52,
+                    gender: 'Male',
+                    admissionDate: '2026-08-20',
+                    dischargeDate: todayStr,
+                    attendingDoctor: 'Dr. Rahul Sharma (Cardiologist)',
+                    diagnosis: 'Acute Coronary Syndrome — Stabilized',
+                    hospitalCourse: 'Patient admitted with acute chest discomfort. Emergency angiography performed; conservative medical management continued with antiplatelets and statins. Hemodynamically stable upon discharge.',
+                    advice: 'Low sodium diet, strict blood pressure monitoring, light walking.',
+                    medications: 'Tab. Aspirin 75mg OD, Tab. Atorvastatin 40mg HS, Tab. Metoprolol 25mg BD',
+                    followUpDate: 'In 7 Days',
+                    status: 'Finalized'
+                },
+                {
+                    id: 'DS-7002',
+                    patientName: 'Rajesh Kumar',
+                    age: 44,
+                    gender: 'Male',
+                    admissionDate: '2026-08-22',
+                    dischargeDate: todayStr,
+                    attendingDoctor: 'Dr. Ananya Roy (General Surgeon)',
+                    diagnosis: 'Acute Appendectomy — Uncomplicated',
+                    hospitalCourse: 'Laparoscopic appendectomy performed under general anesthesia. Post-operative recovery smooth; surgical site clean and healing well. Tolerating normal oral diet.',
+                    advice: 'Avoid heavy weight lifting for 3 weeks. Keep incision clean and dry.',
+                    medications: 'Tab. Augmentin 625mg BD x 5 days, Tab. Zerodol-SP BD x 3 days',
+                    followUpDate: 'In 5 Days',
+                    status: 'Finalized'
+                }
+            ];
+            await DischargeSummary.insertMany(initialSummaries);
+        }
+    } catch (err) {
+        console.error('DischargeSummary seed error:', err);
+    }
+};
+
 /**
  * @swagger
  * components:
@@ -55,6 +99,7 @@ const DischargeSummary = require('../models/DischargeSummary');
  */
 router.get('/stats', async (req, res) => {
     try {
+        await seedInitialSummaries();
         const todayStr = new Date().toISOString().split('T')[0];
         const [total, today, finalized] = await Promise.all([
             DischargeSummary.countDocuments(),
@@ -97,6 +142,7 @@ router.get('/stats', async (req, res) => {
  */
 router.get('/', async (req, res) => {
     try {
+        await seedInitialSummaries();
         const { search } = req.query;
         let filter = {};
         if (search) {

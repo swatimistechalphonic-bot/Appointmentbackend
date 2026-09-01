@@ -2,6 +2,63 @@ const express = require('express');
 const router = express.Router();
 const Vaccination = require('../models/Vaccination');
 
+const seedInitialVaccinations = async () => {
+    try {
+        const count = await Vaccination.countDocuments();
+        if (count === 0) {
+            const initialVaccinations = [
+                {
+                    id: 'VAC-9001',
+                    patientName: 'Aarav Gupta',
+                    age: '6 Months',
+                    vaccineName: 'OPV & DTP Booster 1',
+                    doseNumber: 'Dose 2 of 3',
+                    dueDate: '2026-08-20',
+                    administeredDate: '2026-08-20',
+                    administeredBy: 'Nurse Mary Joseph',
+                    status: 'Completed'
+                },
+                {
+                    id: 'VAC-9002',
+                    patientName: 'Ananya Sharma',
+                    age: '12 Months',
+                    vaccineName: 'MMR (Measles, Mumps, Rubella)',
+                    doseNumber: 'Dose 1 of 2',
+                    dueDate: '2026-08-28',
+                    administeredDate: null,
+                    administeredBy: 'Pending Appointment',
+                    status: 'Scheduled'
+                },
+                {
+                    id: 'VAC-9003',
+                    patientName: 'Rohan Mehta',
+                    age: '5 Years',
+                    vaccineName: 'Typhoid Conjugate Vaccine',
+                    doseNumber: 'Booster Dose',
+                    dueDate: '2026-08-15',
+                    administeredDate: null,
+                    administeredBy: 'Overdue Notice Sent',
+                    status: 'Overdue'
+                },
+                {
+                    id: 'VAC-9004',
+                    patientName: 'Priya Verma',
+                    age: '28 Years',
+                    vaccineName: 'Hepatitis B Recombinant',
+                    doseNumber: 'Dose 3 of 3',
+                    dueDate: '2026-08-24',
+                    administeredDate: '2026-08-24',
+                    administeredBy: 'Nurse Mary Joseph',
+                    status: 'Completed'
+                }
+            ];
+            await Vaccination.insertMany(initialVaccinations);
+        }
+    } catch (err) {
+        console.error('Vaccination seed error:', err);
+    }
+};
+
 /**
  * @swagger
  * components:
@@ -48,6 +105,7 @@ const Vaccination = require('../models/Vaccination');
  */
 router.get('/stats', async (req, res) => {
     try {
+        await seedInitialVaccinations();
         const [total, completed, scheduled, overdue] = await Promise.all([
             Vaccination.countDocuments(),
             Vaccination.countDocuments({ status: 'Completed' }),
@@ -94,6 +152,7 @@ router.get('/stats', async (req, res) => {
  */
 router.get('/', async (req, res) => {
     try {
+        await seedInitialVaccinations();
         const { search, status } = req.query;
         let filter = {};
         if (search) {

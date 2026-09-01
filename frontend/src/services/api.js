@@ -203,4 +203,14 @@ export const vaccinationApi = {
   deleteVaccination: (id) => api.delete(`/vaccinations/${id}`),
 };
 
+// Document Repository API endpoints
+export const documentApi = {
+  getStats: () => api.get('/documents/stats'),
+  getAllDocuments: (params) => api.get('/documents', { params }),
+  getDocumentById: (id) => api.get(`/documents/${id}`),
+  uploadDocument: (data) => api.post('/documents', data),
+  updateDocument: (id, data) => api.put(`/documents/${id}`, data),
+  deleteDocument: (id) => api.delete(`/documents/${id}`),
+};
+
 export default api;

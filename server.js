@@ -13,6 +13,7 @@ const labRoutes = require('./routes/labRoutes');
 const bedRoutes = require('./routes/bedRoutes');
 const dischargeSummaryRoutes = require('./routes/dischargeSummaryRoutes');
 const vaccinationRoutes = require('./routes/vaccinationRoutes');
+const documentRoutes = require('./routes/documentRoutes');
 const { registerMicroservices } = require('./microservices/gateway');
 
 const app = express();
@@ -84,6 +85,7 @@ app.use('/api/labs', labRoutes);
 app.use('/api/beds', bedRoutes);
 app.use('/api/discharge-summaries', dischargeSummaryRoutes);
 app.use('/api/vaccinations', vaccinationRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Default Route
 app.get('/', (req, res) => {

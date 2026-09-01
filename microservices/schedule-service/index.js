@@ -1,108 +1,84 @@
+require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 const express = require('express');
+const cors = require('cors');
 const mongoose = require('mongoose');
-const router = express.Router();
-const { sendSuccess, sendError } = require('../shared/utils/responseHelper');
-const { HTTP_STATUS } = require('../shared/constants');
 
-// ── Schedule (Doctor Availability) Schema ─────────────────────────────────────
+const app = express();
+const PORT = process.env.PORT || 5005;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/appointment_schedule_db';
+
+app.use(cors());
+app.use(express.json());
+
+// ── Connect DB ───────────────────────────────────────────────────────────────
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('✅ Schedule Service connected to MongoDB'))
+  .catch((err) => console.error('❌ Schedule Service DB Connection Error:', err.message));
+
+// ── Schedule Schema ───────────────────────────────────────────────────────────
 const scheduleSchema = new mongoose.Schema({
-  doctor:         { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  doctorName:     { type: String, default: '' },
-  organization:   { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', default: null },
-  dayOfWeek:      { type: String, enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], required: true },
-  startTime:      { type: String, required: true },  // e.g., '09:00'
-  endTime:        { type: String, required: true },  // e.g., '17:00'
-  slotDuration:   { type: Number, default: 15 },     // minutes
-  maxPatients:    { type: Number, default: 20 },
-  isActive:       { type: Boolean, default: true },
-  breakStart:     { type: String, default: '13:00' },
-  breakEnd:       { type: String, default: '14:00' },
-  consultationType: { type: [String], default: ['in-person'] }, // 'in-person', 'telemedicine'
+  doctorId: { type: String, required: true },
+  doctorName: { type: String, required: true },
+  dayOfWeek: { type: String, enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], required: true },
+  startTime: { type: String, required: true },
+  endTime: { type: String, required: true },
+  slotDurationMinutes: { type: Number, default: 30 },
+  maxPatientsPerSlot: { type: Number, default: 1 },
+  isAvailable: { type: Boolean, default: true },
+  organizationId: { type: String, default: null }
 }, { timestamps: true });
-
-scheduleSchema.index({ doctor: 1, dayOfWeek: 1 });
 
 const Schedule = mongoose.models.Schedule || mongoose.model('Schedule', scheduleSchema);
 
-// ── Time Slots Generator ──────────────────────────────────────────────────────
-const generateTimeSlots = (startTime, endTime, duration, breakStart, breakEnd) => {
-  const slots = [];
-  const toMinutes = (t) => {
-    const [h, m] = t.split(':').map(Number);
-    return h * 60 + m;
-  };
-  const toTime = (mins) => `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+// ── Health Check ──────────────────────────────────────────────────────────────
+app.get('/health', (req, res) => {
+  res.json({
+    service: 'Schedule Service',
+    status: 'UP',
+    port: PORT,
+    database: mongoose.connection.readyState === 1 ? 'CONNECTED' : 'DISCONNECTED',
+    timestamp: new Date().toISOString()
+  });
+});
 
-  let current = toMinutes(startTime);
-  const end = toMinutes(endTime);
-  const bStart = toMinutes(breakStart || '13:00');
-  const bEnd = toMinutes(breakEnd || '14:00');
-
-  while (current + duration <= end) {
-    if (current >= bStart && current < bEnd) { current = bEnd; continue; }
-    slots.push({ time: toTime(current), label: toTime(current) + ' – ' + toTime(current + duration) });
-    current += duration;
-  }
-  return slots;
-};
-
-// GET /api/schedules — All schedules
-router.get('/', async (req, res) => {
+// ── Routes ────────────────────────────────────────────────────────────────────
+app.get('/api/schedules', async (req, res) => {
   try {
-    const { doctorId, day } = req.query;
-    let filter = {};
-    if (doctorId) filter.doctor = doctorId;
-    if (day) filter.dayOfWeek = day;
-    const schedules = await Schedule.find(filter).sort({ dayOfWeek: 1, startTime: 1 });
-    return sendSuccess(res, { schedules, count: schedules.length }, 'Schedules fetched');
+    const { doctorId, dayOfWeek, organizationId } = req.query;
+    const filter = {};
+    if (doctorId) filter.doctorId = doctorId;
+    if (dayOfWeek) filter.dayOfWeek = dayOfWeek;
+    if (organizationId) filter.organizationId = organizationId;
+
+    const schedules = await Schedule.find(filter);
+    res.json({ success: true, count: schedules.length, data: schedules });
   } catch (err) {
-    return sendError(res, err.message);
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// GET /api/schedules/slots?doctorId=xxx&day=Monday — Get available time slots
-router.get('/slots', async (req, res) => {
-  try {
-    const { doctorId, day } = req.query;
-    if (!doctorId || !day) return sendError(res, 'doctorId and day required.', HTTP_STATUS.BAD_REQUEST);
-    const schedule = await Schedule.findOne({ doctor: doctorId, dayOfWeek: day, isActive: true });
-    if (!schedule) return sendSuccess(res, { slots: [] }, 'No schedule configured for this day');
-    const slots = generateTimeSlots(schedule.startTime, schedule.endTime, schedule.slotDuration, schedule.breakStart, schedule.breakEnd);
-    return sendSuccess(res, { slots, schedule }, 'Time slots generated');
-  } catch (err) {
-    return sendError(res, err.message);
-  }
-});
-
-// POST /api/schedules — Create schedule
-router.post('/', async (req, res) => {
+app.post('/api/schedules', async (req, res) => {
   try {
     const schedule = await Schedule.create(req.body);
-    return sendSuccess(res, schedule, 'Schedule created', HTTP_STATUS.CREATED);
+    res.status(201).json({ success: true, data: schedule });
   } catch (err) {
-    return sendError(res, err.message);
+    res.status(400).json({ success: false, message: err.message });
   }
 });
 
-// PUT /api/schedules/:id
-router.put('/:id', async (req, res) => {
+app.put('/api/schedules/:id', async (req, res) => {
   try {
     const schedule = await Schedule.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!schedule) return sendError(res, 'Schedule not found.', HTTP_STATUS.NOT_FOUND);
-    return sendSuccess(res, schedule, 'Schedule updated');
+    res.json({ success: true, data: schedule });
   } catch (err) {
-    return sendError(res, err.message);
+    res.status(400).json({ success: false, message: err.message });
   }
 });
 
-// DELETE /api/schedules/:id
-router.delete('/:id', async (req, res) => {
-  try {
-    await Schedule.findByIdAndDelete(req.params.id);
-    return sendSuccess(res, null, 'Schedule deleted');
-  } catch (err) {
-    return sendError(res, err.message);
-  }
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Schedule Service running independently on port ${PORT}`);
+  });
+}
 
-module.exports = { serviceName: 'Doctor Schedule & Slots Service', basePath: '/api/schedules', router };
+module.exports = app;

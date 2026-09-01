@@ -155,6 +155,30 @@ const Sidebar = () => {
         </div>
       </Link>
 
+      {/* Public Website Button */}
+      <div style={{ padding: '0 1rem 0.75rem 1rem' }}>
+        <Link
+          to="/"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justify: 'center',
+            gap: '0.5rem',
+            background: 'rgba(0, 102, 255, 0.15)',
+            border: '1px solid rgba(0, 102, 255, 0.4)',
+            color: '#60A5FA',
+            borderRadius: '10px',
+            padding: '0.55rem',
+            fontSize: '0.82rem',
+            fontWeight: '700',
+            textDecoration: 'none',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <span>🌐 View Public Website</span>
+        </Link>
+      </div>
+
       {/* Navigation Links matching screenshot */}
       <div className="sidebar-menu" style={{ overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
         {menuItems

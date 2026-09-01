@@ -4,7 +4,7 @@ import {
     BedDouble, Search, Plus, X, LayoutGrid, List,
     AlertCircle, CheckCircle2, XCircle, AlertTriangle,
     User, Stethoscope, ArrowRightLeft, LogOut, Trash2,
-    TrendingUp, Activity, Building2
+    TrendingUp, Activity, Building2, UserPlus, Edit
 } from 'lucide-react';
 
 const WARDS = ['All', 'General Ward', 'ICU', 'NICU', 'CCU', 'Emergency', 'Pediatric', 'Maternity', 'Orthopedic', 'Surgical', 'Psychiatric'];
@@ -41,7 +41,16 @@ const BedManagementPage = () => {
 
     // Add bed modal
     const [showAddModal, setShowAddModal] = useState(false);
-    const [bedForm, setBedForm] = useState({ ward: 'General Ward', bedNumber: '' });
+    const [bedForm, setBedForm] = useState({
+        ward: 'General Ward',
+        bedNumber: '',
+        status: 'Available',
+        patientName: '',
+        age: '',
+        gender: 'Male',
+        doctorName: '',
+        diagnosis: ''
+    });
     const [bedFormError, setBedFormError] = useState('');
 
     // Admit modal
@@ -91,9 +100,22 @@ const BedManagementPage = () => {
         e.preventDefault();
         setBedFormError('');
         if (!bedForm.bedNumber.trim()) { setBedFormError('Bed number is required.'); return; }
+        if (bedForm.status === 'Occupied' && (!bedForm.patientName || !bedForm.diagnosis)) {
+            setBedFormError('Patient Name and Diagnosis are required when registering an occupied bed.');
+            return;
+        }
         setSaving(true);
         try {
-            await bedApi.createBed(bedForm);
+            const res = await bedApi.createBed(bedForm);
+            if (bedForm.status === 'Occupied' && res.data?.data?._id) {
+                await bedApi.admitPatient(res.data.data._id, {
+                    patientName: bedForm.patientName,
+                    age: bedForm.age,
+                    gender: bedForm.gender,
+                    doctorName: bedForm.doctorName,
+                    diagnosis: bedForm.diagnosis
+                });
+            }
             setShowAddModal(false);
             fetchAll();
         } catch (err) {
@@ -104,8 +126,8 @@ const BedManagementPage = () => {
     const handleAdmit = async (e) => {
         e.preventDefault();
         setAdmitError('');
-        if (!admitForm.patientName || !admitForm.doctorName || !admitForm.diagnosis) {
-            setAdmitError('Patient name, doctor, and diagnosis are required.');
+        if (!admitForm.patientName || !admitForm.diagnosis) {
+            setAdmitError('Patient name and diagnosis are required.');
             return;
         }
         setSaving(true);
@@ -170,8 +192,11 @@ const BedManagementPage = () => {
                         style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         {viewMode === 'grid' ? <><List size={16} /> Table View</> : <><LayoutGrid size={16} /> Grid View</>}
                     </button>
-                    <button className="btn btn-primary" onClick={() => { setBedForm({ ward: 'General Ward', bedNumber: '' }); setBedFormError(''); setShowAddModal(true); }}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <button className="btn btn-primary" onClick={() => {
+                        setBedForm({ ward: 'General Ward', bedNumber: '', status: 'Available', patientName: '', age: '', gender: 'Male', doctorName: '', diagnosis: '' });
+                        setBedFormError('');
+                        setShowAddModal(true);
+                    }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         <Plus size={16} /> Add Bed
                     </button>
                 </div>
@@ -232,7 +257,7 @@ const BedManagementPage = () => {
                 </div>
             ) : viewMode === 'grid' ? (
                 /* ── Grid View ── */
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
                     {beds.length === 0 ? (
                         <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
                             <BedDouble size={48} color="#E2E8F0" style={{ display: 'block', margin: '0 auto 14px' }} />
@@ -267,9 +292,11 @@ const BedManagementPage = () => {
                                             <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: 2 }}>
                                                 <span style={{ fontWeight: 600 }}>Dx:</span> {bed.diagnosis}
                                             </div>
-                                            <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                <Stethoscope size={11} /> {bed.doctorName}
-                                            </div>
+                                            {bed.doctorName && (
+                                                <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                    <Stethoscope size={11} /> {bed.doctorName}
+                                                </div>
+                                            )}
                                             {bed.admitDate && (
                                                 <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: 2 }}>
                                                     Admitted: {bed.admitDate}
@@ -292,17 +319,15 @@ const BedManagementPage = () => {
                                         <div style={{ color: 'var(--text-muted)', fontSize: '0.84rem', margin: '8px 0 12px' }}>
                                             {bed.status === 'Available' ? 'Bed is ready for patient admission.' : 'Bed is being cleaned / prepared.'}
                                         </div>
-                                        <div style={{ display: 'flex', gap: 6 }}>
-                                            {bed.status === 'Available' && (
-                                                <button className="btn btn-primary btn-sm" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
-                                                    onClick={() => { setSelectedBed(bed); setAdmitForm({ patientName: '', age: '', gender: 'Male', doctorName: '', diagnosis: '' }); setAdmitError(''); setShowAdmitModal(true); }}>
-                                                    <Plus size={13} /> Admit Patient
-                                                </button>
-                                            )}
+                                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                            <button className="btn btn-primary btn-sm" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+                                                onClick={() => { setSelectedBed(bed); setAdmitForm({ patientName: '', age: '', gender: 'Male', doctorName: '', diagnosis: '' }); setAdmitError(''); setShowAdmitModal(true); }}>
+                                                <UserPlus size={13} /> Mark Occupied / Admit
+                                            </button>
                                             {bed.status === 'Cleaning' && (
-                                                <button className="btn btn-sm" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, background: '#D1FAE5', color: '#065F46', border: '1px solid #A7F3D0' }}
+                                                <button className="btn btn-sm" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, background: '#D1FAE5', color: '#065F46', border: '1px solid #A7F3D0' }}
                                                     onClick={() => handleMarkAvailable(bed._id)}>
-                                                    <CheckCircle2 size={13} /> Mark Available
+                                                    <CheckCircle2 size={13} /> Ready
                                                 </button>
                                             )}
                                             <button className="btn btn-sm" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#F1F5F9', color: '#94A3B8', border: '1px solid #E2E8F0' }}
@@ -359,9 +384,9 @@ const BedManagementPage = () => {
                                         <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{bed.admitDate || '—'}</td>
                                         <td>
                                             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                                                {bed.status === 'Available' && (
+                                                {bed.status !== 'Occupied' && (
                                                     <button className="btn btn-primary btn-sm" onClick={() => { setSelectedBed(bed); setAdmitForm({ patientName: '', age: '', gender: 'Male', doctorName: '', diagnosis: '' }); setAdmitError(''); setShowAdmitModal(true); }}
-                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Plus size={12} /> Admit</button>
+                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><UserPlus size={12} /> Mark Occupied</button>
                                                 )}
                                                 {bed.status === 'Occupied' && (<>
                                                     <button className="btn btn-secondary btn-sm" onClick={() => { setSelectedBed(bed); setTransferTargetId(''); setTransferError(''); setShowTransferModal(true); }}
@@ -388,7 +413,7 @@ const BedManagementPage = () => {
             {/* ── Add Bed Modal ── */}
             {showAddModal && (
                 <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowAddModal(false)}>
-                    <div className="modal-content" style={{ maxWidth: 440 }}>
+                    <div className="modal-content" style={{ maxWidth: 500 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                             <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <BedDouble size={18} color="#0066FF" /> Add New Bed
@@ -397,20 +422,66 @@ const BedManagementPage = () => {
                         </div>
                         {bedFormError && <div className="alert alert-error" style={{ marginBottom: '1rem', display: 'flex', gap: 8 }}><AlertCircle size={15} /> {bedFormError}</div>}
                         <form onSubmit={handleAddBed}>
-                            <div className="form-group">
-                                <label>Ward *</label>
-                                <select className="input-field" value={bedForm.ward} onChange={e => setBedForm({ ...bedForm, ward: e.target.value })}>
-                                    {WARD_OPTIONS.map(w => <option key={w}>{w}</option>)}
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label>Bed Number *</label>
-                                <input className="input-field" value={bedForm.bedNumber} onChange={e => setBedForm({ ...bedForm, bedNumber: e.target.value })} required placeholder="e.g. G-101, ICU-03" />
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div className="form-group">
+                                    <label>Ward *</label>
+                                    <select className="input-field" value={bedForm.ward} onChange={e => setBedForm({ ...bedForm, ward: e.target.value })}>
+                                        {WARD_OPTIONS.map(w => <option key={w}>{w}</option>)}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>Bed Number *</label>
+                                    <input className="input-field" value={bedForm.bedNumber} onChange={e => setBedForm({ ...bedForm, bedNumber: e.target.value })} required placeholder="e.g. G-101, ICU-03" />
+                                </div>
+                                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                    <label>Initial Status *</label>
+                                    <select className="input-field" value={bedForm.status} onChange={e => setBedForm({ ...bedForm, status: e.target.value })}>
+                                        <option value="Available">Available (Ready for Patients)</option>
+                                        <option value="Occupied">Occupied (Admit Patient Immediately)</option>
+                                        <option value="Cleaning">Cleaning / Under Maintenance</option>
+                                    </select>
+                                </div>
+
+                                {bedForm.status === 'Occupied' && (
+                                    <>
+                                        <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                            <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0.2rem 0' }} />
+                                            <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0066FF' }}>Patient Admission Details:</span>
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Patient Name *</label>
+                                            <input className="input-field" value={bedForm.patientName} onChange={e => setBedForm({ ...bedForm, patientName: e.target.value })} required placeholder="Patient Full Name" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Age</label>
+                                            <input className="input-field" type="number" value={bedForm.age} onChange={e => setBedForm({ ...bedForm, age: e.target.value })} placeholder="45" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Gender</label>
+                                            <select className="input-field" value={bedForm.gender} onChange={e => setBedForm({ ...bedForm, gender: e.target.value })}>
+                                                <option>Male</option>
+                                                <option>Female</option>
+                                                <option>Other</option>
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Attending Doctor</label>
+                                            <select className="input-field" value={bedForm.doctorName} onChange={e => setBedForm({ ...bedForm, doctorName: e.target.value })}>
+                                                <option value="">-- Select Doctor --</option>
+                                                {doctors.map(d => <option key={d._id} value={d.name}>{d.name}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                            <label>Diagnosis *</label>
+                                            <input className="input-field" value={bedForm.diagnosis} onChange={e => setBedForm({ ...bedForm, diagnosis: e.target.value })} required placeholder="Reason for Admission" />
+                                        </div>
+                                    </>
+                                )}
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
                                 <button type="submit" className="btn btn-primary" disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                    {saving ? 'Adding...' : <><Plus size={15} /> Add Bed</>}
+                                    {saving ? 'Saving...' : <><Plus size={15} /> Save Bed</>}
                                 </button>
                             </div>
                         </form>
@@ -418,13 +489,13 @@ const BedManagementPage = () => {
                 </div>
             )}
 
-            {/* ── Admit Modal ── */}
+            {/* ── Admit Modal / Mark Occupied ── */}
             {showAdmitModal && selectedBed && (
                 <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowAdmitModal(false)}>
                     <div className="modal-content">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                             <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <Plus size={18} color="#0066FF" /> Admit Patient
+                                <UserPlus size={18} color="#0066FF" /> Mark Bed Occupied — Admit Patient
                             </h2>
                             <button onClick={() => setShowAdmitModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={22} /></button>
                         </div>
@@ -440,8 +511,8 @@ const BedManagementPage = () => {
                                     <input className="input-field" value={admitForm.patientName} onChange={e => setAdmitForm({ ...admitForm, patientName: e.target.value })} required placeholder="Full name" />
                                 </div>
                                 <div className="form-group">
-                                    <label>Age *</label>
-                                    <input className="input-field" type="number" min="0" value={admitForm.age} onChange={e => setAdmitForm({ ...admitForm, age: e.target.value })} required />
+                                    <label>Age</label>
+                                    <input className="input-field" type="number" min="0" value={admitForm.age} onChange={e => setAdmitForm({ ...admitForm, age: e.target.value })} placeholder="45" />
                                 </div>
                                 <div className="form-group">
                                     <label>Gender</label>
@@ -450,8 +521,8 @@ const BedManagementPage = () => {
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label>Attending Doctor *</label>
-                                    <select className="input-field" value={admitForm.doctorName} onChange={e => setAdmitForm({ ...admitForm, doctorName: e.target.value })} required>
+                                    <label>Attending Doctor</label>
+                                    <select className="input-field" value={admitForm.doctorName} onChange={e => setAdmitForm({ ...admitForm, doctorName: e.target.value })}>
                                         <option value="">-- Select Doctor --</option>
                                         {doctors.map(d => <option key={d._id} value={d.name}>{d.name}</option>)}
                                     </select>
@@ -464,7 +535,7 @@ const BedManagementPage = () => {
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowAdmitModal(false)}>Cancel</button>
                                 <button type="submit" className="btn btn-primary" disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                    {saving ? 'Admitting...' : <><CheckCircle2 size={15} /> Admit Patient</>}
+                                    {saving ? 'Admitting...' : <><CheckCircle2 size={15} /> Confirm &amp; Mark Occupied</>}
                                 </button>
                             </div>
                         </form>

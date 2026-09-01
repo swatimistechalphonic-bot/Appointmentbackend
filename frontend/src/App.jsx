@@ -33,6 +33,7 @@ import BedManagementPage from './pages/BedManagementPage';
 import ReferralsPage from './pages/ReferralsPage';
 import VaccinationsPage from './pages/VaccinationsPage';
 import DischargeSummariesPage from './pages/DischargeSummariesPage';
+import PublicWebsite from './pages/PublicWebsite';
 import {
   ClipboardList,
   FolderHeart,
@@ -93,31 +94,33 @@ const AppLayout = () => {
         <Navbar />
         <main className="page-content">
           <Routes>
-            <Route path="/" element={<ProtectedRoute><DoctorDashboard /></ProtectedRoute>} />
-            <Route path="/appointments" element={<ProtectedRoute><PatientDashboard /></ProtectedRoute>} />
-            <Route path="/doctors" element={<ProtectedRoute><DoctorsPage /></ProtectedRoute>} />
-            <Route path="/patients" element={<ProtectedRoute><PatientsPage /></ProtectedRoute>} />
-            <Route path="/schedules" element={<ProtectedRoute><SchedulesPage /></ProtectedRoute>} />
-            <Route path="/queue" element={<ProtectedRoute><QueueManagementPage /></ProtectedRoute>} />
-            <Route path="/records" element={<ProtectedRoute><MedicalRecordsPage /></ProtectedRoute>} />
-            <Route path="/prescriptions" element={<ProtectedRoute><PrescriptionsPage /></ProtectedRoute>} />
-            <Route path="/messages" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
-            <Route path="/telemedicine" element={<ProtectedRoute><TelemedicinePage /></ProtectedRoute>} />
-            <Route path="/departments" element={<ProtectedRoute><DepartmentsPage /></ProtectedRoute>} />
-            <Route path="/services" element={<ProtectedRoute><ServicesPage /></ProtectedRoute>} />
-            <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
-            <Route path="/lab" element={<ProtectedRoute><LabPage /></ProtectedRoute>} />
-            <Route path="/documents" element={<ProtectedRoute><DocumentsPage /></ProtectedRoute>} />
-            <Route path="/beds" element={<ProtectedRoute><BedManagementPage /></ProtectedRoute>} />
-            <Route path="/referrals" element={<ProtectedRoute><ReferralsPage /></ProtectedRoute>} />
-            <Route path="/vaccinations" element={<ProtectedRoute><VaccinationsPage /></ProtectedRoute>} />
-            <Route path="/discharge-summaries" element={<ProtectedRoute><DischargeSummariesPage /></ProtectedRoute>} />
-            <Route path="/reviews" element={<ProtectedRoute><ReviewsPage /></ProtectedRoute>} />
-            <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
-            <Route path="/staff" element={<ProtectedRoute><StaffRolesPage /></ProtectedRoute>} />
-            <Route path="/logs" element={<ProtectedRoute><AuditLogsPage /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><DoctorsPage /></ProtectedRoute>} />
+            <Route path="/" element={<DoctorDashboard />} />
+            <Route path="/appointments" element={<PatientDashboard />} />
+            <Route path="/doctors" element={<DoctorsPage />} />
+            <Route path="/patients" element={<PatientsPage />} />
+            <Route path="/schedules" element={<SchedulesPage />} />
+            <Route path="/queue" element={<QueueManagementPage />} />
+            <Route path="/records" element={<MedicalRecordsPage />} />
+            <Route path="/prescriptions" element={<PrescriptionsPage />} />
+            <Route path="/messages" element={<ChatPage />} />
+            <Route path="/telemedicine" element={<TelemedicinePage />} />
+            <Route path="/departments" element={<DepartmentsPage />} />
+            <Route path="/services" element={<ServicesPage />} />
+            <Route path="/payments" element={<PaymentsPage />} />
+            <Route path="/lab" element={<LabPage />} />
+            <Route path="/documents" element={<DocumentsPage />} />
+            <Route path="/beds" element={<BedManagementPage />} />
+            <Route path="/referrals" element={<ReferralsPage />} />
+            <Route path="/vaccinations" element={<VaccinationsPage />} />
+            <Route path="/discharge-summaries" element={<DischargeSummariesPage />} />
+            <Route path="/dischargesummaries" element={<DischargeSummariesPage />} />
+            <Route path="/discharge" element={<DischargeSummariesPage />} />
+            <Route path="/reviews" element={<ReviewsPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/staff" element={<StaffRolesPage />} />
+            <Route path="/logs" element={<AuditLogsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/profile" element={<DoctorsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
@@ -131,9 +134,13 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
+          <Route path="/" element={<PublicWebsite />} />
+          <Route path="/website" element={<PublicWebsite />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/*" element={<AppLayout />} />
+          <Route path="/dashboard/*" element={<ProtectedRoute><AppLayout /></ProtectedRoute>} />
+          <Route path="/admin/*" element={<ProtectedRoute><AppLayout /></ProtectedRoute>} />
+          <Route path="/*" element={<ProtectedRoute><AppLayout /></ProtectedRoute>} />
         </Routes>
       </Router>
     </AuthProvider>
